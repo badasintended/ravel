@@ -9,7 +9,7 @@ intelliJPlatform = "2.9.0"
 kotlin = "2.1.20"
 kover = "0.9.1"
 mapping-io = "0.7.1"
-qodana = "2025.1.1"
+qodana = "2025.2.1"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
