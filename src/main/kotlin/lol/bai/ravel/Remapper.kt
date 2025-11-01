@@ -65,7 +65,6 @@ private fun Mappings.newName(method: MethodMapping): String? {
 
 /**
  * TODO: Currently tested with WTHIT
- *  - nested class replaced with fully qualified name
  *  - mixin
  *  - access widener
  *  - kotlin
@@ -122,43 +121,60 @@ fun remap(project: Project, model: RemapperModel) {
                 val newFieldName = model.mappings.newName(mField) ?: return@r true
 
                 val pRefElt = pRef.referenceNameElement!!
+                assert(pRefElt is PsiIdentifier)
+
                 writers.add {
-                    pRefElt.replace(javaFactory.createExpressionFromText(newFieldName, pRefElt))
+                    pRefElt.replace(javaFactory.createIdentifier(newFieldName))
                 }
                 return@r true
             }
 
             if (pTarget is PsiMethod) {
                 val newMethodName = newMethodName(pTarget) ?: return@r true
+
                 val pRefElt = pRef.referenceNameElement!!
+                assert(pRefElt is PsiIdentifier)
+
                 writers.add {
-                    pRefElt.replace(javaFactory.createExpressionFromText(newMethodName, pRefElt))
+                    pRefElt.replace(javaFactory.createIdentifier(newMethodName))
                 }
                 return@r true
             }
 
-            if (pTarget is PsiClass) {
-                val pClassName = pTarget.qualifiedName ?: return@r true
-                val mClass = mClasses[pClassName] ?: return@r true
-                val newClassName = model.mappings.newName(mClass) ?: return@r true
-                val refElt = pRef.referenceNameElement!!
+            fun replaceClass(pClass: PsiClass, pClassRef: PsiJavaCodeReferenceElement) {
+                val pClassName = pClass.qualifiedName ?: return
+                val mClass = mClasses[pClassName] ?: return
+                val newClassName = model.mappings.newName(mClass) ?: return
+
+                val pRefElt = pClassRef.referenceNameElement!!
+                assert(pRefElt is PsiIdentifier)
 
                 val newRefName = newClassName.substringAfterLast('.')
                 writers.add {
-                    // TODO: Malformed type errors, seem to be only a log messages
-                    //       Can't seem to be caught using try-catch block
-                    refElt.replace(javaFactory.createExpressionFromText(newRefName, refElt))
+                    pRefElt.replace(javaFactory.createIdentifier(newRefName))
                 }
 
-                val refQual = pRef.qualifier
-                if (refQual != null) {
-                    val newQualName = newClassName.substringBeforeLast('.')
-                    writers.add {
-                        refQual.replace(javaFactory.createExpressionFromText(newQualName, refQual))
+                val pRefQual = pClassRef.qualifier
+                if (pRefQual != null) {
+                    assert(pRefQual is PsiJavaCodeReferenceElement)
+                    pRefQual as PsiJavaCodeReferenceElement
+
+                    val pRefQualTarget = pRefQual.resolve()
+                    if (pRefQualTarget is PsiClass) {
+                        replaceClass(pRefQualTarget, pRefQual)
+                    } else {
+                        assert(pRefQualTarget is PsiPackage)
+
+                        val newQualName = newClassName.substringBeforeLast('.')
+                        writers.add {
+                            pRefQual.replace(javaFactory.createPackageReferenceElement(newQualName))
+                        }
                     }
                 }
-                return@r true
+                return
             }
+
+            if (pTarget is PsiClass) replaceClass(pTarget, pRef)
 
             return@r true
         }
