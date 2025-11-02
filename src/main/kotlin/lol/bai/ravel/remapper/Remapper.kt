@@ -28,7 +28,8 @@ abstract class Remapper<F : PsiFile>(
 }
 
 private val remappers = listOf(
-    JavaRemapper
+    JavaRemapper,
+    MixinRemapper,
 )
 
 /**
@@ -42,7 +43,7 @@ fun remap(project: Project, model: RemapperModel) {
 
     val mClasses = linkedMapOf<String, ClassMapping>()
     model.mappings.first().tree.classes.forEach {
-        mClasses[replaceQualifier(it.srcName)] = it
+        mClasses[replaceAllQualifier(it.srcName)] = it
     }
 
     val writers = arrayListOf<Runnable>()
@@ -73,9 +74,8 @@ fun remap(project: Project, model: RemapperModel) {
 }
 
 private val rawQualifierSeparators = Regex("[/$]")
-private fun replaceQualifier(raw: String): String {
-    return raw.replace(rawQualifierSeparators, ".")
-}
+internal fun replaceAllQualifier(raw: String) = raw.replace(rawQualifierSeparators, ".")
+internal fun replacePkgQualifier(raw: String) = raw.replace('/', '.')
 
 internal fun Mappings.newName(cls: ClassMapping): String? {
     var className = cls.srcName
@@ -85,7 +85,7 @@ internal fun Mappings.newName(cls: ClassMapping): String? {
         className = mClass.getName(m.dest)
     }
 
-    return if (className == cls.srcName) null else replaceQualifier(className)
+    return if (className == cls.srcName) null else className
 }
 
 internal fun Mappings.newName(field: FieldMapping): String? {
@@ -153,4 +153,8 @@ internal inline fun <reified E : PsiElement> PsiElement.process(crossinline acti
         action(it)
         true
     }
+}
+
+internal inline fun <reified E: PsiElement> PsiElement.parent(): E? {
+    return PsiTreeUtil.getParentOfType(this, E::class.java)
 }

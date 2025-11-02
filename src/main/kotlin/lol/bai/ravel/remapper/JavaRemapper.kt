@@ -13,12 +13,7 @@ import com.intellij.psi.PsiTypes
 
 object JavaRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
 
-    fun newMethodName(mappings: Mappings, mClasses: ClassMappings, pMethod: PsiMethod): String? {
-        val pMethod = pMethod.findDeepestSuperMethods().firstOrNull() ?: pMethod
-        val pClass = pMethod.containingClass ?: return null
-        val pClassName = pClass.qualifiedName ?: return null
-        val mClass = mClasses[pClassName] ?: return null
-
+    fun signature(pMethod: PsiMethod): String {
         val mSignatureBuilder = StringBuilder()
         mSignatureBuilder.append("(")
         for (pParam in pMethod.parameterList.parameters) {
@@ -28,10 +23,17 @@ object JavaRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
         val pReturn = pMethod.returnType ?: PsiTypes.voidType()
         mSignatureBuilder.append(pReturn.toRaw())
         val mSignature = mSignatureBuilder.toString()
+        return mSignature
+    }
 
+    fun newMethodName(mappings: Mappings, mClasses: ClassMappings, pMethod: PsiMethod): String? {
+        val pMethod = pMethod.findDeepestSuperMethods().firstOrNull() ?: pMethod
+        val pClass = pMethod.containingClass ?: return null
+        val pClassName = pClass.qualifiedName ?: return null
+        val mClass = mClasses[pClassName] ?: return null
+        val mSignature = signature(pMethod)
         val mMethod = mClass.getMethod(pMethod.name, mSignature) ?: return null
         val newMethodName = mappings.newName(mMethod) ?: return null
-
         return newMethodName
     }
 
@@ -64,7 +66,8 @@ object JavaRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
             fun replaceClass(pClass: PsiClass, pClassRef: PsiJavaCodeReferenceElement) {
                 val pClassName = pClass.qualifiedName ?: return
                 val mClass = mClasses[pClassName] ?: return
-                val newClassName = mappings.newName(mClass) ?: return
+                var newClassName = mappings.newName(mClass) ?: return
+                newClassName = replaceAllQualifier(newClassName)
 
                 val pRefElt = pClassRef.referenceNameElement as PsiIdentifier
                 val newRefName = newClassName.substringAfterLast('.')
