@@ -21,6 +21,7 @@ object MixinRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
     const val Invoker        = "${mixin}.gen.Invoker"
     const val Accessor       = "${mixin}.gen.Accessor"
     const val At             = "${mixin}.injection.At"
+    const val Slice          = "${mixin}.injection.Slice"
     const val Inject         = "${mixin}.injection.Inject"
     const val ModifyArg      = "${mixin}.injection.ModifyArg"
     const val ModifyArgs     = "${mixin}.injection.ModifyArgs"
@@ -35,13 +36,16 @@ object MixinRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
     const val Mutable        = "${mixin}.Mutable"
 
     const val mixinextras           = "com.llamalad7.mixinextras"
-    const val ModifyExpressionValue ="${mixinextras}.injector.ModifyExpressionValue"
-    const val ModifyReceiver        ="${mixinextras}.injector.ModifyReceiver"
-    const val ModifyReturnValue     ="${mixinextras}.injector.ModifyReturnValue"
-    const val WrapWithCondition     ="${mixinextras}.injector.WrapWithCondition"
-    const val WrapWithCondition2    ="${mixinextras}.injector.v2.WrapWithCondition"
-    const val WrapMethod            ="${mixinextras}.injector.wrapmethod.WrapMethod"
-    const val WrapOperation         ="${mixinextras}.injector.wrapoperation.WrapOperation"
+    const val ModifyExpressionValue = "${mixinextras}.injector.ModifyExpressionValue"
+    const val ModifyReceiver        = "${mixinextras}.injector.ModifyReceiver"
+    const val ModifyReturnValue     = "${mixinextras}.injector.ModifyReturnValue"
+    const val WrapWithCondition     = "${mixinextras}.injector.WrapWithCondition"
+    const val WrapWithCondition2    = "${mixinextras}.injector.v2.WrapWithCondition"
+    const val WrapMethod            = "${mixinextras}.injector.wrapmethod.WrapMethod"
+    const val WrapOperation         = "${mixinextras}.injector.wrapoperation.WrapOperation"
+    const val Cancellable           = "${mixinextras}.sugar.Cancellable"
+    const val Local                 = "${mixinextras}.sugar.Local"
+    const val Share                 = "${mixinextras}.sugar.Share"
     // @formatter:on
 
     val INJECTS = setOf(
@@ -93,8 +97,20 @@ object MixinRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
             val className = pClass.qualifiedName ?: return@r
             val annotationName = pAnnotation.qualifiedName ?: return@r
 
-            fun warnNotLiterals() {
-                writers.add { JavaRemapper.comment(psi, pClass, "TODO(Ravel): target not a literal or array of literals") }
+            if (!annotationName.startsWith(mixin) && !annotationName.startsWith(mixinextras)) return@r
+
+            if (annotationName == Slice) return@r
+            if (annotationName == Unique) return@r
+            if (annotationName == Final) return@r
+            if (annotationName == Debug) return@r
+            if (annotationName == Intrinsic) return@r
+            if (annotationName == Mutable) return@r
+            if (annotationName == Cancellable) return@r
+            if (annotationName == Local) return@r
+            if (annotationName == Share) return@r
+
+            fun warnNotLiterals(pElt: PsiElement) {
+                writers.add { JavaRemapper.comment(psi, pElt, "TODO(Ravel): target not a literal or array of literals") }
                 thisLogger().warn("$className: target not a literal or array of literals")
             }
 
@@ -119,10 +135,10 @@ object MixinRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
 
                     is PsiArrayInitializerMemberValue -> pTargets.initializers.forEach {
                         if (it is PsiLiteralExpression) remapTarget(it)
-                        else warnNotLiterals()
+                        else warnNotLiterals(pClass)
                     }
 
-                    else -> warnNotLiterals()
+                    else -> warnNotLiterals(pClass)
                 }
 
                 val pValues = pAnnotation.findDeclaredAttributeValue("value")
@@ -135,18 +151,18 @@ object MixinRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
                 return@r
             }
 
-            fun targetClassName(memberName: String): String? {
+            fun targetClassName(pMember: PsiMember): String? {
                 val targetClassName = mixinTargets[className]
                 if (targetClassName == null) {
-                    writers.add { JavaRemapper.comment(psi, pClass, "TODO(Ravel): Could not determine a single target") }
-                    thisLogger().warn("$className#$memberName: Could not determine a single target")
+                    writers.add { JavaRemapper.comment(psi, pMember, "TODO(Ravel): Could not determine a single target") }
+                    thisLogger().warn("$className#${pMember.name}: Could not determine a single target")
                     return null
                 }
                 return targetClassName
             }
 
-            fun mTargetClass(memberName: String): ClassMapping? {
-                val targetClassName = targetClassName(memberName) ?: return null
+            fun mTargetClass(pMember: PsiMember): ClassMapping? {
+                val targetClassName = targetClassName(pMember) ?: return null
                 val mTargetClass = mClasses[targetClassName] ?: return null
                 return mTargetClass
             }
@@ -155,7 +171,7 @@ object MixinRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
                 if (!isRemapped(pAnnotation)) return@r
                 val pMethod = pAnnotation.parent<PsiMethod>() ?: return@r
                 val methodName = pMethod.name
-                val mTargetClass = mTargetClass(methodName) ?: return@r
+                val mTargetClass = mTargetClass(pMethod) ?: return@r
 
                 var targetSignature: String? = null
                 var targetMethodName = when {
@@ -177,7 +193,7 @@ object MixinRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
                 }
 
                 if (targetMethodName == null) {
-                    writers.add { JavaRemapper.comment(psi, pClass, "TODO(Ravel): No target method") }
+                    writers.add { JavaRemapper.comment(psi, pMethod, "TODO(Ravel): No target method") }
                     thisLogger().warn("$className#$methodName: No target method")
                     return@r
                 }
@@ -196,7 +212,7 @@ object MixinRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
                 if (!isRemapped(pAnnotation)) return@r
                 val pMethod = pAnnotation.parent<PsiMethod>() ?: return@r
                 val methodName = pMethod.name
-                val mTargetClass = mTargetClass(methodName) ?: return@r
+                val mTargetClass = mTargetClass(pMethod) ?: return@r
 
                 var targetFieldName = when {
                     methodName.startsWith("get") -> methodName.removePrefix("get").decapitalize()
@@ -209,7 +225,7 @@ object MixinRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
                 if (pValue is PsiLiteralExpression) targetFieldName = pValue.value as String
 
                 if (targetFieldName == null) {
-                    writers.add { JavaRemapper.comment(psi, pClass, "TODO(Ravel): No target field") }
+                    writers.add { JavaRemapper.comment(psi, pMethod, "TODO(Ravel): No target field") }
                     thisLogger().warn("$className#$methodName: No target field")
                     return@r
                 }
@@ -229,17 +245,17 @@ object MixinRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
 
                 val pDesc = pAnnotation.findDeclaredAttributeValue("target")
                 if (pDesc != null) {
-                    writers.add { JavaRemapper.comment(psi, pClass, "TODO(Ravel): target desc is not supported") }
+                    writers.add { JavaRemapper.comment(psi, pMethod, "TODO(Ravel): target desc is not supported") }
                     thisLogger().warn("$className#$methodName: target desc is not supported")
                     return@r
                 }
 
                 fun remapTargetMethod(pTarget: PsiLiteralExpression) {
-                    val targetClassName = targetClassName(methodName) ?: return
+                    val targetClassName = targetClassName(pMethod) ?: return
 
                     val targetMethod = pTarget.value as String
                     if (targetMethod.contains('*') || targetMethod.contains(' ')) {
-                        writers.add { JavaRemapper.comment(psi, pClass, "TODO(Ravel): wildcard and target are not supported") }
+                        writers.add { JavaRemapper.comment(psi, pMethod, "TODO(Ravel): wildcard and target are not supported") }
                         thisLogger().warn("$className#$methodName: wildcard and regex target are not supported")
                         return
                     }
@@ -262,7 +278,7 @@ object MixinRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
                             for (it in mClass.methods) {
                                 if (it.srcName != targetMethodName) continue
                                 if (mMethod != null) {
-                                    writers.add { JavaRemapper.comment(psi, pClass, "TODO(Ravel): target method is ambiguous") }
+                                    writers.add { JavaRemapper.comment(psi, pMethod, "TODO(Ravel): target method is ambiguous") }
                                     thisLogger().warn("$className#$methodName: target method is ambiguous")
                                     return
                                 }
@@ -283,10 +299,10 @@ object MixinRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
                     is PsiLiteralExpression -> remapTargetMethod(pTargetMethods)
                     is PsiArrayInitializerMemberValue -> pTargetMethods.initializers.forEach {
                         if (it is PsiLiteralExpression) remapTargetMethod(it)
-                        else warnNotLiterals()
+                        else warnNotLiterals(pMethod)
                     }
 
-                    else -> warnNotLiterals()
+                    else -> warnNotLiterals(pMethod)
                 }
                 return@r
             }
@@ -301,20 +317,20 @@ object MixinRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
                 val point = pPoint.value as String
 
                 if (!InjectionPoint.ALL.contains(point)) {
-                    writers.add { JavaRemapper.comment(psi, pClass, "TODO(Ravel): Unknown injection point $point") }
+                    writers.add { JavaRemapper.comment(psi, pMethod, "TODO(Ravel): Unknown injection point $point") }
                     thisLogger().warn("$className#$methodName: Unknown injection point $point")
                     return@r
                 }
 
                 val pDesc = pAnnotation.findDeclaredAttributeValue("desc")
                 if (pDesc != null) {
-                    writers.add { JavaRemapper.comment(psi, pClass, "TODO(Ravel): @At.desc is not supported") }
+                    writers.add { JavaRemapper.comment(psi, pMethod, "TODO(Ravel): @At.desc is not supported") }
                     thisLogger().warn("$className#$methodName: @At.desc is not supported")
                 }
 
                 val pArgs = pAnnotation.findDeclaredAttributeValue("args")
                 if (pArgs != null) {
-                    writers.add { JavaRemapper.comment(psi, pClass, "TODO(Ravel): @At.args is not supported") }
+                    writers.add { JavaRemapper.comment(psi, pMethod, "TODO(Ravel): @At.args is not supported") }
                     thisLogger().warn("$className#$methodName: @At.args is not supported")
                 }
 
@@ -323,7 +339,7 @@ object MixinRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
                 val target = pTarget.value as String
 
                 if (target.contains('*')) {
-                    writers.add { JavaRemapper.comment(psi, pClass, "TODO(Ravel): wildcard @At.target is not supported") }
+                    writers.add { JavaRemapper.comment(psi, pMethod, "TODO(Ravel): wildcard @At.target is not supported") }
                     thisLogger().warn("$className#$methodName: wildcard @At.target is not supported")
                     return@r
                 }
@@ -334,7 +350,7 @@ object MixinRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
                         if (targetHasClassName) replaceAllQualifier(target.removePrefix("L").substringBefore(';'))
                         else mixinTargets[className]
                     if (targetClassName == null) {
-                        writers.add { JavaRemapper.comment(psi, pClass, "TODO(Ravel): Could not determine @At.target field owner") }
+                        writers.add { JavaRemapper.comment(psi, pMethod, "TODO(Ravel): Could not determine @At.target field owner") }
                         thisLogger().warn("$className#$methodName: Could not determine @At.target field owner")
                         return@r
                     }
@@ -363,7 +379,7 @@ object MixinRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
 
                 if (InjectionPoint.INVOKES.contains(point)) {
                     if (!target.contains('(')) {
-                        writers.add { JavaRemapper.comment(psi, pClass, "TODO(Ravel): @At.target doesn't have a description") }
+                        writers.add { JavaRemapper.comment(psi, pMethod, "TODO(Ravel): @At.target doesn't have a description") }
                         thisLogger().warn("$className#$methodName: @At.target doesn't have a description")
                     }
 
@@ -372,7 +388,7 @@ object MixinRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
                         if (targetHasClassName) replaceAllQualifier(target.removePrefix("L").substringBefore(';'))
                         else mixinTargets[className]
                     if (targetClassName == null) {
-                        writers.add { JavaRemapper.comment(psi, pClass, "TODO(Ravel): Could not determine @At.target method owner") }
+                        writers.add { JavaRemapper.comment(psi, pMethod, "TODO(Ravel): Could not determine @At.target method owner") }
                         thisLogger().warn("$className#$methodName: Could not determine @At.target method owner")
                         return@r
                     }
@@ -423,7 +439,7 @@ object MixinRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
                     return@r
                 }
 
-                val mTargetClass = mTargetClass(memberName) ?: return@r
+                val mTargetClass = mTargetClass(pMember) ?: return@r
 
                 val pPrefix = pAnnotation.findDeclaredAttributeValue("prefix")
                 val prefix = if (pPrefix is PsiLiteralExpression) (pPrefix.value as String) else "shadow$"
@@ -477,16 +493,9 @@ object MixinRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
                 return@r
             }
 
-            if (annotationName == Unique) return@r
-            if (annotationName == Final) return@r
-            if (annotationName == Debug) return@r
-            if (annotationName == Intrinsic) return@r
-            if (annotationName == Mutable) return@r
-
-            if (annotationName.startsWith(mixin) || annotationName.startsWith(mixinextras)) {
-                writers.add { JavaRemapper.comment(psi, pClass, "TODO(Ravel): remapper for $annotationName not implemented") }
-                thisLogger().warn("$className: unknown annotation $annotationName")
-            }
+            val pMember = pAnnotation.parent<PsiMember>() ?: pClass
+            writers.add { JavaRemapper.comment(psi, pMember, "TODO(Ravel): remapper for $annotationName not implemented") }
+            thisLogger().warn("$className: unknown annotation $annotationName")
         }
     }
 
