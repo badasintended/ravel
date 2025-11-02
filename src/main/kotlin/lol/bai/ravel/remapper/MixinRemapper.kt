@@ -33,9 +33,21 @@ object MixinRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
     const val Debug          = "${mixin}.Debug"
     const val Intrinsic      = "${mixin}.Intrinsic"
     const val Mutable        = "${mixin}.Mutable"
+
+    const val mixinextras           = "com.llamalad7.mixinextras"
+    const val ModifyExpressionValue ="${mixinextras}.injector.ModifyExpressionValue"
+    const val ModifyReceiver        ="${mixinextras}.injector.ModifyReceiver"
+    const val ModifyReturnValue     ="${mixinextras}.injector.ModifyReturnValue"
+    const val WrapWithCondition     ="${mixinextras}.injector.WrapWithCondition"
+    const val WrapWithCondition2    ="${mixinextras}.injector.v2.WrapWithCondition"
+    const val WrapMethod            ="${mixinextras}.injector.wrapmethod.WrapMethod"
+    const val WrapOperation         ="${mixinextras}.injector.wrapoperation.WrapOperation"
     // @formatter:on
 
-    val INJECTS = setOf(Inject, ModifyArg, ModifyArgs, ModifyConstant, ModifyVariable, Redirect)
+    val INJECTS = setOf(
+        Inject, ModifyArg, ModifyArgs, ModifyConstant, ModifyVariable, Redirect,
+        ModifyExpressionValue, ModifyReceiver, ModifyReturnValue, WrapWithCondition, WrapWithCondition2, WrapMethod, WrapOperation
+    )
 
     object InjectionPoint {
         // @formatter:off
@@ -50,9 +62,10 @@ object MixinRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
         const val JUMP          = "JUMP"
         const val CONSTANT      = "CONSTANT"
         const val STORE         = "STORE"
+        const val EXPRESSION    = "MIXINEXTRAS:EXPRESSION"
         // @formatter:on
 
-        val ALL = setOf(HEAD, RETURN, TAIL, INVOKE, INVOKE_ASSIGN, FIELD, NEW, INVOKE_STRING, JUMP, CONSTANT, STORE)
+        val ALL = setOf(HEAD, RETURN, TAIL, INVOKE, INVOKE_ASSIGN, FIELD, NEW, INVOKE_STRING, JUMP, CONSTANT, STORE, EXPRESSION)
         val INVOKES = setOf(INVOKE, INVOKE_ASSIGN, INVOKE_STRING)
     }
 
@@ -470,7 +483,7 @@ object MixinRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
             if (annotationName == Intrinsic) return@r
             if (annotationName == Mutable) return@r
 
-            if (annotationName.startsWith(mixin)) {
+            if (annotationName.startsWith(mixin) || annotationName.startsWith(mixinextras)) {
                 writers.add { JavaRemapper.comment(psi, pClass, "TODO(Ravel): remapper for $annotationName not implemented") }
                 thisLogger().warn("$className: unknown annotation $annotationName")
             }
