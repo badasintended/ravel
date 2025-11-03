@@ -34,7 +34,7 @@ object JavaRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
         return newMethodName
     }
 
-    override fun remap(project: Project, mappings: Mappings, mClasses: ClassMappings, pFile: PsiJavaFile, writers: Writers) {
+    override fun remap(project: Project, mappings: Mappings, mClasses: ClassMappings, pFile: PsiJavaFile, write: Writer) {
         val psi = JavaPsiFacade.getInstance(project).elementFactory
 
         pFile.process r@{ pRef: PsiJavaCodeReferenceElement ->
@@ -48,7 +48,7 @@ object JavaRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
                 val newFieldName = mappings.map(mField) ?: return@r
 
                 val pRefElt = pRef.referenceNameElement as PsiIdentifier
-                writers.add { pRefElt.replace(psi.createIdentifier(newFieldName)) }
+                write { pRefElt.replace(psi.createIdentifier(newFieldName)) }
                 return@r
             }
 
@@ -56,7 +56,7 @@ object JavaRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
                 val newMethodName = newMethodName(mappings, mClasses, pTarget) ?: return@r
 
                 val pRefElt = pRef.referenceNameElement as PsiIdentifier
-                writers.add { pRefElt.replace(psi.createIdentifier(newMethodName)) }
+                write { pRefElt.replace(psi.createIdentifier(newMethodName)) }
                 return@r
             }
 
@@ -68,7 +68,7 @@ object JavaRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
 
                 val pRefElt = pClassRef.referenceNameElement as PsiIdentifier
                 val newRefName = newClassName.substringAfterLast('.')
-                writers.add { pRefElt.replace(psi.createIdentifier(newRefName)) }
+                write { pRefElt.replace(psi.createIdentifier(newRefName)) }
 
                 val pRefQual = pClassRef.qualifier as? PsiJavaCodeReferenceElement
                 if (pRefQual != null) {
@@ -78,7 +78,7 @@ object JavaRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
                     } else {
                         pRefQualTarget as PsiPackage
                         val newQualName = newClassName.substringBeforeLast('.')
-                        writers.add { pRefQual.replace(psi.createPackageReferenceElement(newQualName)) }
+                        write { pRefQual.replace(psi.createPackageReferenceElement(newQualName)) }
                     }
                 }
             }
@@ -88,7 +88,7 @@ object JavaRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
 
         pFile.process m@{ pMethod: PsiMethod ->
             val newMethodName = newMethodName(mappings, mClasses, pMethod) ?: return@m
-            writers.add { pMethod.name = newMethodName }
+            write { pMethod.name = newMethodName }
         }
     }
 

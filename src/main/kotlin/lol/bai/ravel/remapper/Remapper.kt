@@ -5,6 +5,7 @@ import com.intellij.openapi.module.Module
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.rootManager
 import com.intellij.openapi.vfs.VfsUtil
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.isFile
 import com.intellij.psi.*
 import com.intellij.psi.util.PsiTreeUtil
@@ -13,7 +14,7 @@ import net.fabricmc.mappingio.tree.MappingTree.*
 
 typealias Mappings = List<Mapping>
 typealias ClassMappings = Map<String, ClassMapping>
-typealias Writers = MutableList<Runnable>
+typealias Writer = (() -> Unit) -> Unit
 
 data class RemapperModel(
     val mappings: MutableList<Mapping> = arrayListOf(),
@@ -24,7 +25,7 @@ abstract class Remapper<F : PsiFile>(
     val extension: String,
     val caster: (PsiFile?) -> F?,
 ) {
-    abstract fun remap(project: Project, mappings: Mappings, mClasses: ClassMappings, pFile: F, writers: Writers)
+    abstract fun remap(project: Project, mappings: Mappings, mClasses: ClassMappings, pFile: F, write: Writer)
 }
 
 private val remappers = listOf(
@@ -45,7 +46,7 @@ fun remap(project: Project, model: RemapperModel) {
         mClasses[replaceAllQualifier(it.srcName)] = it
     }
 
-    val writers = arrayListOf<Runnable>()
+    val fileWriters = hashMapOf<VirtualFile, MutableList<() -> Unit>>()
 
     for (module in model.modules) for (root in module.rootManager.sourceRoots) VfsUtil.iterateChildrenRecursively(root, null) vf@{ vf ->
         if (!vf.isFile) return@vf true
@@ -53,20 +54,24 @@ fun remap(project: Project, model: RemapperModel) {
         for (remapper in remappers) {
             if (vf.extension != remapper.extension) continue
             val file = remapper.caster(psi.findFile(vf)) ?: continue
-            remapper.remap(project, model.mappings, mClasses, file, writers)
+            remapper.remap(project, model.mappings, mClasses, file) { writer ->
+                fileWriters.computeIfAbsent(vf) { arrayListOf() }.add(writer)
+            }
         }
 
         true
     }
 
-    writers.forEach { writer ->
+    fileWriters.forEach { (_, writers) ->
         WriteCommandAction.runWriteCommandAction(project, "Ravel Remapper", null, {
-            @Suppress("UnusedExpression")
-            try {
-                writer.run()
-            } catch (e: Exception) {
-                // TODO: where is the culprit of errors?
-                e
+            writers.forEach { writer ->
+                @Suppress("UnusedExpression")
+                try {
+                    writer.invoke()
+                } catch (e: Exception) {
+                    // TODO: where is the culprit of errors?
+                    e
+                }
             }
         })
     }
@@ -154,6 +159,6 @@ internal inline fun <reified E : PsiElement> PsiElement.process(crossinline acti
     }
 }
 
-internal inline fun <reified E: PsiElement> PsiElement.parent(): E? {
+internal inline fun <reified E : PsiElement> PsiElement.parent(): E? {
     return PsiTreeUtil.getParentOfType(this, E::class.java)
 }
