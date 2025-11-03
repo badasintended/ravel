@@ -1,7 +1,9 @@
 package lol.bai.ravel
 
-import com.intellij.openapi.actionSystem.*
-import com.intellij.openapi.diagnostic.thisLogger
+import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.DataKey
+import com.intellij.openapi.actionSystem.DataProvider
 import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.module.Module
@@ -16,33 +18,11 @@ import com.intellij.ui.ToolbarDecorator
 import com.intellij.ui.components.JBList
 import com.intellij.ui.dsl.builder.bindItem
 import com.intellij.util.ui.JBUI
-import lol.bai.ravel.remapper.RemapperModel
-import lol.bai.ravel.remapper.remap
 import net.fabricmc.mappingio.MappingReader
 import net.fabricmc.mappingio.adapter.MappingSourceNsSwitch
 import net.fabricmc.mappingio.tree.MemoryMappingTree
 import org.jetbrains.annotations.NonNls
 import com.intellij.ui.dsl.builder.panel as rootPanel
-
-
-class RemapperAction : AnAction() {
-    override fun getActionUpdateThread() = ActionUpdateThread.BGT
-
-    override fun update(e: AnActionEvent) {
-        e.presentation.isEnabledAndVisible = e.project != null
-    }
-
-    override fun actionPerformed(e: AnActionEvent) {
-        val project = e.project ?: return
-        val model = RemapperModel()
-        val ok = RemapperDialog(project, model).showAndGet()
-        if (ok) {
-            val time = System.currentTimeMillis()
-            remap(project, model)
-            thisLogger().warn("Remapper took ${System.currentTimeMillis() - time}ms")
-        }
-    }
-}
 
 class RemapperDialog(
     val project: Project,
