@@ -9,7 +9,7 @@ import lol.bai.ravel.mapping.MappingTree
 
 typealias Writer = (() -> Unit) -> Unit
 
-abstract class Remapper<F : PsiFile>(
+abstract class PsiRemapper<F : PsiFile>(
     val extension: String,
     val caster: (PsiFile?) -> F?,
 ) {

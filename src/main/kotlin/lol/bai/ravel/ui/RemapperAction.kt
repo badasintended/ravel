@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
 import lol.bai.ravel.mapping.MappingTree
 import lol.bai.ravel.mapping.MioClassMapping
 import lol.bai.ravel.mapping.MioMappingConfig
-import lol.bai.ravel.remapper.Remapper
+import lol.bai.ravel.remapper.PsiRemapper
 import lol.bai.ravel.util.B
 
 data class RemapperModel(
@@ -99,7 +99,7 @@ class RemapperAction : AnAction() {
                 readActionBlocking r@{
                     if (!vf.isFile) return@r true
 
-                    for (remapper in Remapper.instances) {
+                    for (remapper in PsiRemapper.instances) {
                         if (vf.extension != remapper.extension) continue
                         val pFile = remapper.caster(psi.findFile(vf)) ?: continue
                         val scope = module.getModuleWithDependenciesAndLibrariesScope(true)
