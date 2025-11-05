@@ -1,6 +1,6 @@
 package lol.bai.ravel.mapping
 
-import lol.bai.ravel.wtf
+import lol.bai.ravel.util.wtf
 import net.fabricmc.mappingio.MappedElementKind
 import net.fabricmc.mappingio.MappingVisitor
 

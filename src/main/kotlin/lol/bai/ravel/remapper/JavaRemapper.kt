@@ -3,7 +3,9 @@ package lol.bai.ravel.remapper
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.psi.*
 import com.intellij.psi.javadoc.PsiDocTag
+import fleet.util.Multimap
 import lol.bai.ravel.mapping.rawQualifierSeparators
+import lol.bai.ravel.psi.implicitly
 import lol.bai.ravel.psi.jvmDesc
 
 abstract class JavaRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
@@ -103,44 +105,27 @@ abstract class JavaRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile
             write { pMethod.name = newMethodName }
         }
 
+        val pStaticImportUsages = Multimap<String, PsiMember> { LinkedHashSet() }
         pFile.process r@{ pRef: PsiJavaCodeReferenceElement ->
+            if (pRef is PsiImportStaticReferenceElement) return@r
             val pRefElt = pRef.referenceNameElement as? PsiIdentifier ?: return@r
-
-            // TODO: solve by looking at usages, maybe on it's own pFile.process after this
-            if (pRef is PsiImportStaticReferenceElement) {
-                val pStatement = pRef.parent<PsiImportStaticStatement>() ?: return@r
-                val pClass = pRef.classReference.resolve() as? PsiClass ?: return@r
-                val memberName = pRefElt.text
-
-                val pField = pClass.findFieldByName(memberName, false)
-                val pMethods = pClass.findMethodsByName(memberName, false)
-
-                val newMemberNames = linkedMapOf<String, String>()
-                if (pField != null) newMemberNames["field " + pField.name] = mTree.get(pField)?.newName ?: pField.name
-                for (pMethod in pMethods) newMemberNames["method " + pMethod.name + pMethod.jvmDesc] = mTree.get(pMethod)?.newName ?: pMethod.name
-
-                val uniqueNewMemberNames = newMemberNames.values.toSet()
-                if (uniqueNewMemberNames.size != 1) {
-                    logger.warn("ambiguous static import, members with name $memberName have different new names")
-                    val comment = newMemberNames.map { (k, v) -> "$k -> $v" }.joinToString(separator = "\n")
-                    write { comment(pStatement, "TODO(Ravel): ambiguous static import, members with name $memberName have different new names\n$comment") }
-                    return@r
-                }
-
-                write { pRefElt.replace(factory.createIdentifier(uniqueNewMemberNames.first())) }
-                return@r
-            }
 
             val pTarget = pRef.resolve() ?: return@r
             val pSafeParent = pRef.parent<PsiNamedElement>() ?: pFile
 
             if (pTarget is PsiField) {
+                if (pTarget.implicitly(PsiModifier.STATIC) && pRef.qualifier == null) {
+                    pStaticImportUsages.put(pTarget.name, pTarget)
+                }
                 val newFieldName = remap(pTarget) ?: return@r
                 write { pRefElt.replace(factory.createIdentifier(newFieldName)) }
                 return@r
             }
 
             if (pTarget is PsiMethod) {
+                if (pTarget.implicitly(PsiModifier.STATIC) && pRef.qualifier == null) {
+                    pStaticImportUsages.put(pTarget.name, pTarget)
+                }
                 val newMethodName = remap(pSafeParent, pTarget) ?: return@r
                 write { pRefElt.replace(factory.createIdentifier(newMethodName)) }
                 return@r
@@ -167,6 +152,38 @@ abstract class JavaRemapper : Remapper<PsiJavaFile>("java", { it as? PsiJavaFile
             }
 
             if (pTarget is PsiClass) replaceClass(pTarget, pRef)
+        }
+
+        pFile.process r@{ pRef: PsiImportStaticReferenceElement ->
+            val pRefElt = pRef.referenceNameElement as? PsiIdentifier ?: return@r
+            val pStatement = pRef.parent<PsiImportStaticStatement>() ?: return@r
+            val pClass = pRef.classReference.resolve() as? PsiClass ?: return@r
+            val memberName = pRefElt.text
+
+            val pUsages = pStaticImportUsages[memberName].ifEmpty {
+                val pMembers = arrayListOf<PsiMember>()
+                pMembers.addAll(pClass.findMethodsByName(memberName, false))
+                val pField = pClass.findFieldByName(memberName, false)
+                if (pField != null) pMembers.add(pField)
+                pMembers
+            }
+
+            val newMemberNames = linkedMapOf<String, String>()
+            pUsages.forEach {
+                if (it is PsiMethod) newMemberNames["method " + it.name + it.jvmDesc] = mTree.get(it)?.newName ?: it.name
+                else if (it is PsiField) newMemberNames["field " + it.name] = mTree.get(it)?.newName ?: it.name
+            }
+
+            val uniqueNewMemberNames = newMemberNames.values.toSet()
+            if (uniqueNewMemberNames.size != 1) {
+                logger.warn("ambiguous static import, members with name $memberName have different new names")
+                val comment = newMemberNames.map { (k, v) -> "$k -> $v" }.joinToString(separator = "\n")
+                write { comment(pStatement, "TODO(Ravel): ambiguous static import, members with name $memberName have different new names\n$comment") }
+                return@r
+            }
+
+            write { pRefElt.replace(factory.createIdentifier(uniqueNewMemberNames.first())) }
+            return@r
         }
 
         pFile.process d@{ pDocTag: PsiDocTag ->

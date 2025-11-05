@@ -3,10 +3,10 @@ package lol.bai.ravel.remapper
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.psi.*
 import fleet.util.hashSetMultiMap
-import lol.bai.ravel.decapitalize
 import lol.bai.ravel.mapping.ClassMapping
 import lol.bai.ravel.psi.jvmDesc
 import lol.bai.ravel.psi.jvmName
+import lol.bai.ravel.util.decapitalize
 
 @Suppress("ConstPropertyName")
 object MixinRemapper : JavaRemapper() {

@@ -1,6 +1,7 @@
 package lol.bai.ravel.psi
 
 import com.intellij.psi.*
+import com.intellij.psi.PsiModifier.ModifierConstant
 import lol.bai.ravel.util.Holder
 import lol.bai.ravel.util.put
 
@@ -23,6 +24,16 @@ val PsiClass.jvmName: String?
 
         return jvmNameHolder.put(this, jvmName)
     }
+
+fun PsiModifierListOwner.implicitly(@ModifierConstant modifier: String): Boolean {
+    val modifierList = modifierList ?: return false
+    return modifierList.hasModifierProperty(modifier)
+}
+
+fun PsiModifierListOwner.explicitly(@ModifierConstant modifier: String): Boolean {
+    val modifierList = modifierList ?: return false
+    return modifierList.hasExplicitModifier(modifier)
+}
 
 private val jvmDescHolder = Holder.key<String>("jvmDesc")
 val PsiMethod.jvmDesc: String
