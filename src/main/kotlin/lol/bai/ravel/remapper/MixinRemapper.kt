@@ -13,8 +13,6 @@ object MixinRemapper : JavaRemapper() {
 
     private val logger = thisLogger()
 
-    val rawClassRegex = Regex("L([A-Za-z_$][A-Za-z0-9_$]*(?:/[A-Za-z_$][A-Za-z0-9_$]*)*);")
-
     // @formatter:off
     const val mixin          = "org.spongepowered.asm.mixin"
     const val Mixin          = "${mixin}.Mixin"
@@ -83,7 +81,22 @@ object MixinRemapper : JavaRemapper() {
         return pRemap.value as Boolean
     }
 
-    val mixinTargets = hashSetMultiMap<String, String>()
+    private fun splitClassMember(classMember: String): Pair<String?, String> {
+        if (classMember.startsWith('L')) {
+            // Lpath/to/Class;method()V
+            var (className, memberNameAndDesc) = classMember.split(';', limit = 2)
+            className = className.removePrefix("L")
+            return className to memberNameAndDesc
+        } else if (classMember.contains('.')) {
+            // path/to/Class.method()V
+            val (className, memberNameAndDesc) = classMember.split('.', limit = 2)
+            return className to memberNameAndDesc
+        } else {
+            return null to classMember
+        }
+    }
+
+    private val mixinTargets = hashSetMultiMap<String, String>()
 
     override fun init() {
         super.init()
@@ -294,7 +307,7 @@ object MixinRemapper : JavaRemapper() {
                 val targetMethod = pTarget.value as String
                 if (isWildcardOrRegex(pMethod, targetMethod)) return
 
-                val targetMethodAndDesc = if (targetMethod.startsWith('L')) targetMethod.substringAfter(';') else targetMethod
+                val targetMethodAndDesc = splitClassMember(targetMethod).second
                 val targetMethodName = targetMethodAndDesc.substringBefore('(')
                 val targetMethodDesc = targetMethodAndDesc.removePrefix(targetMethodName)
 
@@ -383,19 +396,22 @@ object MixinRemapper : JavaRemapper() {
         fun remapAtField(pMethod: PsiMethod, key: String, target: String) {
             if (isWildcardOrRegex(pMethod, target)) return
 
-            val targetHasClassName = target.startsWith('L')
-            val targetClassName =
-                if (targetHasClassName) target.removePrefix("L").substringBefore(';')
-                else targetClassName(pMethod)
+            if (!target.contains(':')) {
+                write { comment(pMethod, "TODO(Ravel): target field doesn't have a description") }
+                logger.warn("$className#${pMethod.name}: target field doesn't have a description")
+                return
+            }
+
+            var (targetClassName, targetFieldAndDesc) = splitClassMember(target)
+            if (targetClassName == null) targetClassName = targetClassName(pMethod)
             if (targetClassName == null) {
                 write { comment(pMethod, "TODO(Ravel): Could not determine target field owner") }
                 logger.warn("$className#${pMethod.name}: Could not determine target field owner")
                 return
             }
 
-            val targetFieldAndDesc = if (targetHasClassName) target.substringAfter(';') else target
             val targetFieldName = targetFieldAndDesc.substringBefore(':')
-            val targetFieldDesc = targetFieldAndDesc.substringAfter(':', "")
+            val targetFieldDesc = targetFieldAndDesc.substringAfter(':')
 
             var newTargetClassName = targetClassName
             var newTargetFieldName = targetFieldName
@@ -420,19 +436,17 @@ object MixinRemapper : JavaRemapper() {
             if (!target.contains('(')) {
                 write { comment(pMethod, "TODO(Ravel): target method doesn't have a description") }
                 logger.warn("$className#${pMethod.name}: target method doesn't have a description")
+                return
             }
 
-            val targetHasClassName = target.startsWith('L')
-            val targetClassName =
-                if (targetHasClassName) target.removePrefix("L").substringBefore(';')
-                else targetClassName(pMethod)
+            var (targetClassName, targetMethodAndDesc) = splitClassMember(target)
+            if (targetClassName == null) targetClassName = targetClassName(pMethod)
             if (targetClassName == null) {
                 write { comment(pMethod, "TODO(Ravel): Could not determine target method owner") }
                 logger.warn("$className#${pMethod.name}: Could not determine target method owner")
                 return
             }
 
-            val targetMethodAndDesc = if (targetHasClassName) target.substringAfter(';') else target
             val targetMethodName = targetMethodAndDesc.substringBefore('(')
             val targetMethodDesc = targetMethodAndDesc.removePrefix(targetMethodName)
 

@@ -5,13 +5,10 @@ import com.intellij.psi.PsiField
 import com.intellij.psi.PsiMethod
 import lol.bai.ravel.psi.jvmDesc
 import lol.bai.ravel.psi.jvmName
-import lol.bai.ravel.remapper.MixinRemapper.rawClassRegex
 import lol.bai.ravel.util.Cache
 
-interface Mapping {
-    val oldName: String
-    val newName: String?
-}
+val rawClassRegex = Regex("L([A-Za-z_$][A-Za-z0-9_$]*(?:/[A-Za-z_$][A-Za-z0-9_$]*)*);")
+val rawQualifierSeparators = Regex("[/$]")
 
 class MappingTree {
     private val classes = linkedMapOf<String, ClassMapping>()
@@ -45,7 +42,11 @@ class MappingTree {
     }
 }
 
-val rawQualifierSeparators = Regex("[/$]")
+interface Mapping {
+    val oldName: String
+    val newName: String?
+}
+
 abstract class ClassMapping : Mapping {
     val newFullPeriodName get() = newName?.replace(rawQualifierSeparators, ".")
     val newPkgPeriodName get() = newName?.replace('/', '.')
