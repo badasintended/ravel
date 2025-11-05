@@ -8,7 +8,7 @@ import lol.bai.ravel.mapping.rawQualifierSeparators
 import lol.bai.ravel.psi.implicitly
 import lol.bai.ravel.psi.jvmDesc
 
-abstract class JavaRemapper : PsiRemapper<PsiJavaFile>("java", { it as? PsiJavaFile }) {
+abstract class JavaRemapper : PsiRemapper<PsiJavaFile>(".*\\.java", { it as? PsiJavaFile }) {
     companion object : JavaRemapper()
 
     private val logger = thisLogger()
@@ -16,9 +16,11 @@ abstract class JavaRemapper : PsiRemapper<PsiJavaFile>("java", { it as? PsiJavaF
     protected lateinit var java: JavaPsiFacade
     protected lateinit var factory: PsiElementFactory
 
-    override fun init() {
+    override fun init(): Boolean {
+        if (!super.init()) return false
         java = JavaPsiFacade.getInstance(project)
         factory = java.elementFactory
+        return true
     }
 
     override fun comment(pElt: PsiElement, comment: String) {

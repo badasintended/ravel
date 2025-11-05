@@ -1,43 +1,28 @@
 package lol.bai.ravel.remapper
 
-import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
-import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.psi.PsiManager
 import com.intellij.psi.util.PsiTreeUtil
-import lol.bai.ravel.mapping.MappingTree
+import org.intellij.lang.annotations.Language
 
 typealias Writer = (() -> Unit) -> Unit
 
 abstract class PsiRemapper<F : PsiFile>(
-    val extension: String,
+    @Language("regexp") regex: String,
     val caster: (PsiFile?) -> F?,
-) {
-    companion object {
-        val instances = listOf(
-            MixinRemapper,
-            JavaRemapper
-        )
-    }
+): Remapper(regex) {
 
-    protected lateinit var project: Project
-    protected lateinit var scope: GlobalSearchScope
-    protected lateinit var mTree: MappingTree
     protected lateinit var pFile: F
-    protected lateinit var write: Writer
 
-    protected open fun init() {}
-    fun init(project: Project, scope: GlobalSearchScope, mTree: MappingTree, pFile: F, write: Writer) {
-        this.project = project
-        this.scope = scope
-        this.mTree = mTree
-        this.pFile = pFile
-        this.write = write
-        init()
+    override fun init(): Boolean {
+        val psi = PsiManager.getInstance(project)
+        pFile = caster(psi.findFile(file)) ?: return false
+        return true
     }
 
     abstract fun comment(pElt: PsiElement, comment: String)
-    abstract fun remap()
+    override fun fileComment(comment: String) = comment(pFile, comment)
 
     protected inline fun <reified E : PsiElement> PsiElement.process(crossinline action: (E) -> Unit) {
         PsiTreeUtil.processElements(this, E::class.java) {

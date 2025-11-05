@@ -98,9 +98,10 @@ object MixinRemapper : JavaRemapper() {
 
     private val mixinTargets = hashSetMultiMap<String, String>()
 
-    override fun init() {
-        super.init()
+    override fun init(): Boolean {
+        if (!super.init()) return false
         mixinTargets.clear()
+        return true
     }
 
     override fun remap() = pFile.process a@{ pAnnotation: PsiAnnotation ->

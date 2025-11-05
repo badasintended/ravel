@@ -18,13 +18,12 @@ import com.intellij.platform.ide.progress.TaskCancellation
 import com.intellij.platform.ide.progress.withModalProgress
 import com.intellij.platform.util.progress.ProgressReporter
 import com.intellij.platform.util.progress.reportProgress
-import com.intellij.psi.PsiManager
 import fleet.util.arrayListMultiMap
 import kotlinx.coroutines.launch
 import lol.bai.ravel.mapping.MappingTree
 import lol.bai.ravel.mapping.MioClassMapping
 import lol.bai.ravel.mapping.MioMappingConfig
-import lol.bai.ravel.remapper.PsiRemapper
+import lol.bai.ravel.remapper.Remapper
 import lol.bai.ravel.util.B
 
 data class RemapperModel(
@@ -67,7 +66,6 @@ class RemapperAction : AnAction() {
      */
     suspend fun remap(project: Project, model: RemapperModel) {
         val time = System.currentTimeMillis()
-        val psi = PsiManager.getInstance(project)
 
         val mTree = run(project, B("progress.readingMappings"), 1) {
             indeterminateStep {
@@ -99,15 +97,17 @@ class RemapperAction : AnAction() {
                 readActionBlocking r@{
                     if (!vf.isFile) return@r true
 
-                    for (remapper in PsiRemapper.instances) {
-                        if (vf.extension != remapper.extension) continue
-                        val pFile = remapper.caster(psi.findFile(vf)) ?: continue
+                    for (remapper in Remapper.instances) {
+                        if (!remapper.regex.matches(vf.name)) continue
+
                         val scope = module.getModuleWithDependenciesAndLibrariesScope(true)
-                        remapper.init(project, scope, mTree, pFile) { writer -> fileWriters.put(vf, writer) }
+                        val initialized = remapper.init(project, scope, mTree, vf) { writer -> fileWriters.put(vf, writer) }
+                        if (!initialized) continue
+
                         try {
                             remapper.remap()
                         } catch (e: Exception) {
-                            fileWriters.put(vf) { remapper.comment(pFile, "TODO(Ravel): Failed to fully remap file: ${e.message}") }
+                            fileWriters.put(vf) { remapper.fileComment("TODO(Ravel): Failed to fully remap file: ${e.message}") }
                             logger.error("Failed to fully remap ${vf.path}", e)
                         }
                     }
