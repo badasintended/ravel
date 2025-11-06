@@ -1,52 +1,53 @@
-# ravel
+# Ravel Remapper <img src="src/main/resources/META-INF/pluginIcon.svg" width="100" alt="Ravel Logo" align="right">
 
 ![Build](https://github.com/badasintended/ravel/workflows/Build/badge.svg)
 [![Version](https://img.shields.io/jetbrains/plugin/v/MARKETPLACE_ID.svg)](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID)
 [![Downloads](https://img.shields.io/jetbrains/plugin/d/MARKETPLACE_ID.svg)](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID)
 
-## Template ToDo list
-- [x] Create a new [IntelliJ Platform Plugin Template][template] project.
-- [ ] Get familiar with the [template documentation][template].
-- [ ] Adjust the [pluginGroup](./gradle.properties) and [pluginName](./gradle.properties), as well as the [id](./src/main/resources/META-INF/plugin.xml) and [sources package](./src/main/kotlin).
-- [ ] Adjust the plugin description in `README` (see [Tips][docs:plugin-description])
-- [ ] Review the [Legal Agreements](https://plugins.jetbrains.com/docs/marketplace/legal-agreements.html?from=IJPluginTemplate).
-- [ ] [Publish a plugin manually](https://plugins.jetbrains.com/docs/intellij/publishing-plugin.html?from=IJPluginTemplate) for the first time.
-- [ ] Set the `MARKETPLACE_ID` in the above README badges. You can obtain it once the plugin is published to JetBrains Marketplace.
-- [ ] Set the [Plugin Signing](https://plugins.jetbrains.com/docs/intellij/plugin-signing.html?from=IJPluginTemplate) related [secrets](https://github.com/JetBrains/intellij-platform-plugin-template#environment-variables).
-- [ ] Set the [Deployment Token](https://plugins.jetbrains.com/docs/marketplace/plugin-upload.html?from=IJPluginTemplate).
-- [ ] Click the <kbd>Watch</kbd> button on the top of the [IntelliJ Platform Plugin Template][template] to be notified about releases containing new features and fixes.
-- [ ] Configure the [CODECOV_TOKEN](https://docs.codecov.com/docs/quick-start) secret for automated test coverage reports on PRs
+> **ravel** _[rav-uhl]_ verb    
+> _raveled, raveling, ravelled, ravelling_   
+> to disentangle or unravel the threads or fibers of (a woven or knitted fabric, rope, etc.).
 
 <!-- Plugin description -->
-This Fancy IntelliJ Platform Plugin is going to be your implementation of the brilliant ideas that you have.
 
-This specific section is a source for the [plugin.xml](/src/main/resources/META-INF/plugin.xml) file which will be extracted by the [Gradle](/build.gradle.kts) during the build process.
+Ravel is a plugin for IntelliJ IDEA to remap source files, based on
+[PSI](https://plugins.jetbrains.com/docs/intellij/psi.html) and [Mapping-IO](https://github.com/FabricMC/mapping-io).
 
-To keep everything working, do not remove `<!-- ... -->` sections. 
+Supports remapping:
+
+- [x] Java
+- [ ] Kotlin<sup>soon</sup>
+- [x] [Mixin](https://github.com/FabricMC/Mixin) and [MixinExtras](https://github.com/LlamaLad7/MixinExtras)<sup>1</sup>
+- [x] [Class Transformer / Access Widener](https://github.com/FabricMC/fabric-tooling/tree/main/class-tweaker)
+
+<sup>1</sup>MixinExtras [Expression](https://github.com/LlamaLad7/MixinExtras/wiki/Expressions) is not supported.
+
+## Usage
+
+1. **Commit any changes before attempting to remap your sources!**
+
+2. Right-click the code editor and go to **Refactor** > **Remap Using Ravel**    
+   <img src="docs/right-click.png" width="400" alt="Right Click Action">    
+   You can also find it inside the **Refactor** menu at the top menu
+
+3. Select the mappings to use and modules to remap    
+   <img src="docs/dialog.png" width="400" alt="Remapper Dialog">    
+   Here, I want to remap Fabric API from Yarn to Mojang Mappings, as there is no direct
+   Yarn-to-Mojang mappings, I need to put both Yarn-merged TinyV2 mapping and Mojang ProGuard TXT
+   mapping as the input.
+
+    - Download Yarn mappings from https://maven.fabricmc.net/net/fabricmc/yarn/, download the `mergedv2.jar`,
+      extract it as a ZIP, and select the `mappings/mappings.tiny` file.
+    - Download Mojang mappings from searching the Minecraft version on
+      https://piston-meta.mojang.com/mc/game/version_manifest_v2.json, open the JSON url, search for `client_mappings`,
+      and download the `client.txt`
+
+   Select the source and destination namespace as you see fit.
+
+4. Click OK and wait for the remapping to be done
+
+5. Search for `TODO(Ravel)` for remapping errors and fix them manually
+   <img src="docs/search-todo.png" width="400" alt="Search TODO">
+
 <!-- Plugin description end -->
 
-## Installation
-
-- Using the IDE built-in plugin system:
-  
-  <kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>Marketplace</kbd> > <kbd>Search for "ravel"</kbd> >
-  <kbd>Install</kbd>
-  
-- Using JetBrains Marketplace:
-
-  Go to [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID) and install it by clicking the <kbd>Install to ...</kbd> button in case your IDE is running.
-
-  You can also download the [latest release](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID/versions) from JetBrains Marketplace and install it manually using
-  <kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>⚙️</kbd> > <kbd>Install plugin from disk...</kbd>
-
-- Manually:
-
-  Download the [latest release](https://github.com/badasintended/ravel/releases/latest) and install it manually using
-  <kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>⚙️</kbd> > <kbd>Install plugin from disk...</kbd>
-
-
----
-Plugin based on the [IntelliJ Platform Plugin Template][template].
-
-[template]: https://github.com/JetBrains/intellij-platform-plugin-template
-[docs:plugin-description]: https://plugins.jetbrains.com/docs/intellij/plugin-user-experience.html#plugin-description-and-presentation

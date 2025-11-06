@@ -1,8 +1,8 @@
 <!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
     <id>lol.bai.ravel</id>
-    <name>Ravel</name>
-    <vendor>bai.lol</vendor>
+    <name>Ravel Remapper</name>
+    <vendor>deirn.bai.lol</vendor>
 
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.java</depends>
@@ -14,7 +14,8 @@
 
     <actions>
         <action id="lol.bai.ravel.ui.RemapperAction"
-                class="lol.bai.ravel.ui.RemapperAction">
+                class="lol.bai.ravel.ui.RemapperAction"
+                icon="/icons/pluginAction.svg">
             <add-to-group group-id="RefactoringMenu"/>
         </action>
 
