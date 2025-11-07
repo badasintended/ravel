@@ -1,4 +1,4 @@
-# Ravel Remapper <img src="src/main/resources/META-INF/pluginIcon.svg" width="100" alt="Ravel Logo" align="right">
+# Ravel Remapper <img src="src/main/resources/META-INF/pluginIcon.svg" width="300" alt="Ravel Logo" align="right">
 
 ![Build](https://github.com/badasintended/ravel/workflows/Build/badge.svg)
 [![Version](https://img.shields.io/jetbrains/plugin/v/MARKETPLACE_ID.svg)](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID)
@@ -18,7 +18,7 @@ Supports remapping:
 - [x] Java
 - [ ] Kotlin<sup>soon</sup>
 - [x] [Mixin](https://github.com/FabricMC/Mixin) and [MixinExtras](https://github.com/LlamaLad7/MixinExtras)<sup>1</sup>
-- [x] [Class Transformer / Access Widener](https://github.com/FabricMC/fabric-tooling/tree/main/class-tweaker)
+- [x] [Class Tweaker / Access Widener](https://github.com/FabricMC/fabric-tooling/tree/main/class-tweaker)
 
 <sup>1</sup>MixinExtras [Expression](https://github.com/LlamaLad7/MixinExtras/wiki/Expressions) is not supported.
 
