@@ -8,74 +8,71 @@ import lol.bai.ravel.psi.jvmName
 import lol.bai.ravel.util.decapitalize
 import lol.bai.ravel.util.setMultiMap
 
-@Suppress("ConstPropertyName")
+// @formatter:off
+private const val mixin          = "org.spongepowered.asm.mixin"
+private const val Mixin          = "${mixin}.Mixin"
+private const val Shadow         = "${mixin}.Shadow"
+private const val Unique         = "${mixin}.Unique"
+private const val Final          = "${mixin}.Final"
+private const val Debug          = "${mixin}.Debug"
+private const val Intrinsic      = "${mixin}.Intrinsic"
+private const val Mutable        = "${mixin}.Mutable"
+private const val Overwrite      = "${mixin}.Overwrite"
+private const val Dynamic        = "${mixin}.Dynamic"
+private const val Invoker        = "${mixin}.gen.Invoker"
+private const val Accessor       = "${mixin}.gen.Accessor"
+private const val At             = "${mixin}.injection.At"
+private const val Slice          = "${mixin}.injection.Slice"
+private const val Inject         = "${mixin}.injection.Inject"
+private const val ModifyArg      = "${mixin}.injection.ModifyArg"
+private const val ModifyArgs     = "${mixin}.injection.ModifyArgs"
+private const val ModifyConstant = "${mixin}.injection.ModifyConstant"
+private const val ModifyVariable = "${mixin}.injection.ModifyVariable"
+private const val Redirect       = "${mixin}.injection.Redirect"
+private const val Coerce         = "${mixin}.injection.Coerce"
+
+private const val mixinextras           = "com.llamalad7.mixinextras"
+private const val ModifyExpressionValue = "${mixinextras}.injector.ModifyExpressionValue"
+private const val ModifyReceiver        = "${mixinextras}.injector.ModifyReceiver"
+private const val ModifyReturnValue     = "${mixinextras}.injector.ModifyReturnValue"
+private const val WrapWithCondition     = "${mixinextras}.injector.WrapWithCondition"
+private const val WrapWithCondition2    = "${mixinextras}.injector.v2.WrapWithCondition"
+private const val WrapMethod            = "${mixinextras}.injector.wrapmethod.WrapMethod"
+private const val WrapOperation         = "${mixinextras}.injector.wrapoperation.WrapOperation"
+private const val Cancellable           = "${mixinextras}.sugar.Cancellable"
+private const val Local                 = "${mixinextras}.sugar.Local"
+private const val Share                 = "${mixinextras}.sugar.Share"
+private const val Definition            = "${mixinextras}.expression.Definition"
+// @formatter:on
+
+private val INJECTS = setOf(
+    Inject, ModifyArg, ModifyArgs, ModifyConstant, ModifyVariable, Redirect,
+    ModifyExpressionValue, ModifyReceiver, ModifyReturnValue, WrapWithCondition, WrapWithCondition2, WrapMethod, WrapOperation
+)
+
+private object Point {
+    // @formatter:off
+    const val HEAD          = "HEAD"
+    const val RETURN        = "RETURN"
+    const val TAIL          = "TAIL"
+    const val INVOKE        = "INVOKE"
+    const val INVOKE_ASSIGN = "INVOKE_ASSIGN"
+    const val FIELD         = "FIELD"
+    const val NEW           = "NEW"
+    const val INVOKE_STRING = "INVOKE_STRING"
+    const val JUMP          = "JUMP"
+    const val CONSTANT      = "CONSTANT"
+    const val STORE         = "STORE"
+    const val LOAD          = "LOAD"
+    const val EXPRESSION    = "MIXINEXTRAS:EXPRESSION"
+    // @formatter:on
+
+    val INVOKES = setOf(INVOKE, INVOKE_ASSIGN, INVOKE_STRING)
+}
+
 class MixinRemapper : JavaRemapper() {
 
     private val logger = thisLogger()
-
-    companion object {
-        // @formatter:off
-        const val mixin          = "org.spongepowered.asm.mixin"
-        const val Mixin          = "${mixin}.Mixin"
-        const val Shadow         = "${mixin}.Shadow"
-        const val Unique         = "${mixin}.Unique"
-        const val Final          = "${mixin}.Final"
-        const val Debug          = "${mixin}.Debug"
-        const val Intrinsic      = "${mixin}.Intrinsic"
-        const val Mutable        = "${mixin}.Mutable"
-        const val Overwrite      = "${mixin}.Overwrite"
-        const val Dynamic        = "${mixin}.Dynamic"
-        const val Invoker        = "${mixin}.gen.Invoker"
-        const val Accessor       = "${mixin}.gen.Accessor"
-        const val At             = "${mixin}.injection.At"
-        const val Slice          = "${mixin}.injection.Slice"
-        const val Inject         = "${mixin}.injection.Inject"
-        const val ModifyArg      = "${mixin}.injection.ModifyArg"
-        const val ModifyArgs     = "${mixin}.injection.ModifyArgs"
-        const val ModifyConstant = "${mixin}.injection.ModifyConstant"
-        const val ModifyVariable = "${mixin}.injection.ModifyVariable"
-        const val Redirect       = "${mixin}.injection.Redirect"
-        const val Coerce         = "${mixin}.injection.Coerce"
-
-        const val mixinextras           = "com.llamalad7.mixinextras"
-        const val ModifyExpressionValue = "${mixinextras}.injector.ModifyExpressionValue"
-        const val ModifyReceiver        = "${mixinextras}.injector.ModifyReceiver"
-        const val ModifyReturnValue     = "${mixinextras}.injector.ModifyReturnValue"
-        const val WrapWithCondition     = "${mixinextras}.injector.WrapWithCondition"
-        const val WrapWithCondition2    = "${mixinextras}.injector.v2.WrapWithCondition"
-        const val WrapMethod            = "${mixinextras}.injector.wrapmethod.WrapMethod"
-        const val WrapOperation         = "${mixinextras}.injector.wrapoperation.WrapOperation"
-        const val Cancellable           = "${mixinextras}.sugar.Cancellable"
-        const val Local                 = "${mixinextras}.sugar.Local"
-        const val Share                 = "${mixinextras}.sugar.Share"
-        const val Definition            = "${mixinextras}.expression.Definition"
-        // @formatter:on
-
-        val INJECTS = setOf(
-            Inject, ModifyArg, ModifyArgs, ModifyConstant, ModifyVariable, Redirect,
-            ModifyExpressionValue, ModifyReceiver, ModifyReturnValue, WrapWithCondition, WrapWithCondition2, WrapMethod, WrapOperation
-        )
-    }
-
-    object Point {
-        // @formatter:off
-        const val HEAD          = "HEAD"
-        const val RETURN        = "RETURN"
-        const val TAIL          = "TAIL"
-        const val INVOKE        = "INVOKE"
-        const val INVOKE_ASSIGN = "INVOKE_ASSIGN"
-        const val FIELD         = "FIELD"
-        const val NEW           = "NEW"
-        const val INVOKE_STRING = "INVOKE_STRING"
-        const val JUMP          = "JUMP"
-        const val CONSTANT      = "CONSTANT"
-        const val STORE         = "STORE"
-        const val LOAD          = "LOAD"
-        const val EXPRESSION    = "MIXINEXTRAS:EXPRESSION"
-        // @formatter:on
-
-        val INVOKES = setOf(INVOKE, INVOKE_ASSIGN, INVOKE_STRING)
-    }
 
     private fun isRemapped(pAnnotation: PsiAnnotation): Boolean {
         val pRemap = pAnnotation.findAttributeValue("remap") ?: return true
@@ -540,7 +537,7 @@ class MixinRemapper : JavaRemapper() {
 
             if (point == Point.NEW) {
                 val newTarget = if (target.startsWith('(')) mTree.remapDesc(target) else {
-                    val mClass = mTree.getClass(target)?: return@a
+                    val mClass = mTree.getClass(target) ?: return@a
                     mClass.newName ?: target
                 }
 

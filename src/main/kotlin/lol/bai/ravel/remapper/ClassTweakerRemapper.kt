@@ -5,21 +5,18 @@ import kotlin.io.path.readLines
 import kotlin.io.path.useLines
 
 private val regex = Regex(".*")
-@Suppress("ConstPropertyName")
+private const val accessWidener = "accessWidener"
+private const val classTweaker = "classTweaker"
+
+private object Entry {
+    val header = Regex("^([A-Za-z]+)\\s+v(\\d+)\\s+(\\w+)\\s*$")
+    val clazz = Regex("^([\\w-]+\\s+class\\s+)([\\w/$]+)(.*)")
+    val field = Regex("^([\\w-]+\\s+field\\s+)([\\w/$]+)(\\s+)([\\w$]+)(\\s+)([\\w/$;\\[]+)(.*)")
+    val method = Regex("^([\\w-]+\\s+method\\s+)([\\w/$]+)(\\s+)([\\w$<>]+)(\\s+)([\\w/$;\\[()]+)(.*)")
+    val injectInterface = Regex("^([\\w-]*inject-interface\\s+)([\\w/$]+)(\\s+)([\\w/$]+)(.*)")
+}
+
 class ClassTweakerRemapper : Remapper(regex) {
-
-    companion object {
-        const val accessWidener = "accessWidener"
-        const val classTweaker = "classTweaker"
-    }
-
-    object Entry {
-        val header = Regex("^([A-Za-z]+)\\s+v(\\d+)\\s+(\\w+)\\s*$")
-        val clazz = Regex("^([\\w-]+\\s+class\\s+)([\\w/$]+)(.*)")
-        val field = Regex("^([\\w-]+\\s+field\\s+)([\\w/$]+)(\\s+)([\\w$]+)(\\s+)([\\w/$;\\[]+)(.*)")
-        val method = Regex("^([\\w-]+\\s+method\\s+)([\\w/$]+)(\\s+)([\\w$<>]+)(\\s+)([\\w/$;\\[()]+)(.*)")
-        val injectInterface = Regex("^([\\w-]*inject-interface\\s+)([\\w/$]+)(\\s+)([\\w/$]+)(.*)")
-    }
 
     private lateinit var lines: List<String>
 
