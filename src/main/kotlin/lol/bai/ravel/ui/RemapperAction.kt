@@ -18,13 +18,13 @@ import com.intellij.platform.ide.progress.TaskCancellation
 import com.intellij.platform.ide.progress.withModalProgress
 import com.intellij.platform.util.progress.ProgressReporter
 import com.intellij.platform.util.progress.reportProgress
-import fleet.util.arrayListMultiMap
 import kotlinx.coroutines.launch
 import lol.bai.ravel.mapping.MappingTree
 import lol.bai.ravel.mapping.MioClassMapping
 import lol.bai.ravel.mapping.MioMappingConfig
 import lol.bai.ravel.remapper.Remapper
 import lol.bai.ravel.util.B
+import lol.bai.ravel.util.listMultiMap
 
 data class RemapperModel(
     val mappings: MutableList<MioMappingConfig> = arrayListOf(),
@@ -93,7 +93,7 @@ class RemapperAction : AnAction() {
         }
 
         val fileWriters = run(project, B("progress.processing"), files.size) {
-            val fileWriters = arrayListMultiMap<VirtualFile, () -> Unit>()
+            val fileWriters = listMultiMap<VirtualFile, () -> Unit>()
             for ((vf, module) in files) itemStep(vf.path) {
                 readActionBlocking r@{
                     if (!vf.isFile) return@r true
@@ -120,7 +120,7 @@ class RemapperAction : AnAction() {
 
         logger.warn("Mapping resolved in ${System.currentTimeMillis() - time}ms")
 
-        run(project, B("progress.remapping"), fileWriters.size()) {
+        run(project, B("progress.remapping"), fileWriters.size) {
             @Suppress("UnstableApiUsage")
             fileWriters.forEach { (vf, writers) ->
                 itemStep(vf.path) {

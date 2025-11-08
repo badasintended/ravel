@@ -2,11 +2,11 @@ package lol.bai.ravel.remapper
 
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.psi.*
-import fleet.util.hashSetMultiMap
 import lol.bai.ravel.mapping.ClassMapping
 import lol.bai.ravel.psi.jvmDesc
 import lol.bai.ravel.psi.jvmName
 import lol.bai.ravel.util.decapitalize
+import lol.bai.ravel.util.setMultiMap
 
 @Suppress("ConstPropertyName")
 class MixinRemapper : JavaRemapper() {
@@ -98,7 +98,7 @@ class MixinRemapper : JavaRemapper() {
         }
     }
 
-    private val mixinTargets = hashSetMultiMap<String, String>()
+    private val mixinTargets = setMultiMap<String, String>()
 
     override fun init(): Boolean {
         if (!super.init()) return false
@@ -183,7 +183,7 @@ class MixinRemapper : JavaRemapper() {
         }
 
         fun targetClassName(pMember: PsiMember): String? {
-            val targetClassName = mixinTargets[className]
+            val targetClassName = mixinTargets[className].orEmpty()
             if (targetClassName.size != 1) {
                 write { comment(pMember, "TODO(Ravel): Could not determine a single target") }
                 logger.warn("$className#${pMember.name}: Could not determine a single target")
@@ -300,7 +300,7 @@ class MixinRemapper : JavaRemapper() {
             }
 
             fun remapTargetMethod(pTarget: PsiLiteralExpression) {
-                val targetClassNames = mixinTargets[className]
+                val targetClassNames = mixinTargets[className].orEmpty()
                 if (targetClassNames.isEmpty()) {
                     write { comment(pMethod, "TODO(Ravel): no target class") }
                     logger.warn("$className#$methodName: no target class")

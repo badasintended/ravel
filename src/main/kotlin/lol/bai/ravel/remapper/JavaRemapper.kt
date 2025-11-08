@@ -3,12 +3,12 @@ package lol.bai.ravel.remapper
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.psi.*
 import com.intellij.psi.javadoc.PsiDocTag
-import fleet.util.Multimap
 import lol.bai.ravel.mapping.rawQualifierSeparators
 import lol.bai.ravel.psi.implicitly
 import lol.bai.ravel.psi.jvmDesc
 import lol.bai.ravel.psi.jvmName
 import lol.bai.ravel.psi.jvmRaw
+import lol.bai.ravel.util.linkedSetMultiMap
 
 private val regex = Regex(".*\\.java")
 
@@ -151,7 +151,7 @@ open class JavaRemapper : PsiRemapper<PsiJavaFile>(regex, { it as? PsiJavaFile }
             write { pRecordComponent.name = uniqueNewGetterName }
         }
 
-        val pStaticImportUsages = Multimap<String, PsiMember> { LinkedHashSet() }
+        val pStaticImportUsages = linkedSetMultiMap<String, PsiMember>()
         pFile.process r@{ pRef: PsiJavaCodeReferenceElement ->
             if (pRef is PsiImportStaticReferenceElement) return@r
             val pRefId = pRef.referenceNameElement as? PsiIdentifier ?: return@r
@@ -216,7 +216,7 @@ open class JavaRemapper : PsiRemapper<PsiJavaFile>(regex, { it as? PsiJavaFile }
             val pClass = pRef.classReference.resolve() as? PsiClass ?: return@r
             val memberName = pRefId.text
 
-            val pUsages = pStaticImportUsages[memberName].ifEmpty {
+            val pUsages = pStaticImportUsages[memberName].orEmpty().ifEmpty {
                 val pMembers = arrayListOf<PsiMember>()
                 pMembers.addAll(pClass.findMethodsByName(memberName, false))
                 val pField = pClass.findFieldByName(memberName, false)
