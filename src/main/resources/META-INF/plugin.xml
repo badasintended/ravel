@@ -33,6 +33,10 @@
                 icon="AllIcons.General.Remove"/>
     </actions>
 
+    <extensions defaultExtensionNs="org.jetbrains.kotlin">
+        <supportsKotlinPluginMode supportsK2="true"/>
+    </extensions>
+
     <extensionPoints>
         <extensionPoint name="remapper"
                         beanClass="lol.bai.ravel.remapper.RemapperBean"

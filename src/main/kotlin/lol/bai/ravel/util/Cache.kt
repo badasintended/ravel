@@ -8,9 +8,9 @@ class Cache<K, V> {
         .map { it.value!! as V }
 
     fun has(key: K): Boolean = map.containsKey(key)
-    fun get(key: K): V? = map.getOrPut(key) { Holder.ofNull() }.value
+    fun get(key: K): V? = map.getOrPut(key) { null.held }.value
     fun put(key: K, value: V?) {
-        map[key] = Holder.ofNullable(value)
+        map[key] = value.held
     }
 
     inline fun getOrPut(key: K, defaultValue: () -> V?): V? {

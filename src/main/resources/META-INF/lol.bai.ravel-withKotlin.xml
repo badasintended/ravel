@@ -1,5 +1,5 @@
 <idea-plugin>
     <extensions defaultExtensionNs="lol.bai.ravel">
-        <remapper implementation="lol.bai.ravel.remapper.KotlinRemapper"/>
+        <remapper id="kotlin" implementation="lol.bai.ravel.remapper.KotlinRemapper"/>
     </extensions>
 </idea-plugin>
