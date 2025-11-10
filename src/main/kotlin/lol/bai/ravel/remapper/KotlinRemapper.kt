@@ -161,11 +161,13 @@ class KotlinRemapper : JvmRemapper<KtFile>(regex, { it as? KtFile }) {
             if (kRefParent is KtThisExpression) return@r
 
             val pRef = kRef.reference ?: return@r
-            val pTarget = pRef.resolve() ?: return@r
+            val pTarget = pRef.resolve() as? PsiNamedElement ?: return@r
             val pSafeParent = kRef.parent<PsiNamedElement>() ?: pFile
 
             var staticTargetClassName: String? = null
             run t@{
+                if (pTarget.name != kRef.getReferencedName()) return@t
+
                 if (pTarget is KtProperty) {
                     if (pTarget.isTopLevel) staticTargetClassName = pTarget.containingKtFile.jvmName
                     val newTargetName = remap(pSafeParent, pTarget) ?: return@t
