@@ -34,4 +34,6 @@ abstract class PsiRemapper<F : PsiFile>(
         return PsiTreeUtil.getParentOfType(this, E::class.java)
     }
 
+    protected val PsiElement.depth get() = PsiTreeUtil.getDepth(this, null)
+
 }

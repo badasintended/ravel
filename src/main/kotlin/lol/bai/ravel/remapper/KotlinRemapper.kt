@@ -1,6 +1,5 @@
 package lol.bai.ravel.remapper
 
-import ai.grazie.utils.toLinkedSet
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.psi.*
 import lol.bai.ravel.psi.implicitly
@@ -9,10 +8,15 @@ import lol.bai.ravel.util.Holder
 import lol.bai.ravel.util.decapitalize
 import lol.bai.ravel.util.held
 import lol.bai.ravel.util.linkedSetMultiMap
+import org.jetbrains.kotlin.asJava.canHaveSyntheticGetter
 import org.jetbrains.kotlin.asJava.toLightElements
 import org.jetbrains.kotlin.asJava.toLightMethods
 import org.jetbrains.kotlin.idea.base.psi.kotlinFqName
+import org.jetbrains.kotlin.lexer.KtTokens
+import org.jetbrains.kotlin.load.java.propertyNameByGetMethodName
+import org.jetbrains.kotlin.load.java.propertyNamesBySetMethodName
 import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.containingClassOrObject
 import org.jetbrains.kotlin.psi.psiUtil.isImportDirectiveExpression
@@ -42,7 +46,7 @@ class KotlinRemapper : JvmRemapper<KtFile>(regex, { it as? KtFile }) {
     }
 
     private fun <T> remap(pSafeElt: PsiElement, kProperty: T): String? where T : KtNamedDeclaration, T : KtValVarKeywordOwner {
-        val jElts = kProperty.toLightElements().toLinkedSet()
+        val jElts = kProperty.toLightElements().toSet()
         if (jElts.isEmpty()) return null
 
         val newNames = linkedMapOf<PsiElement, Holder<String?>>()
@@ -99,7 +103,7 @@ class KotlinRemapper : JvmRemapper<KtFile>(regex, { it as? KtFile }) {
     }
 
     private fun remap(pSafeElt: PsiElement, kFun: KtNamedFunction): String? {
-        val jMethods = kFun.toLightMethods().toLinkedSet()
+        val jMethods = kFun.toLightMethods().toSet()
         if (jMethods.isEmpty()) return null
 
         val newNames = linkedMapOf<PsiMethod, Holder<String?>>()
@@ -159,7 +163,7 @@ class KotlinRemapper : JvmRemapper<KtFile>(regex, { it as? KtFile }) {
         }
 
         val pMemberImportUsages = linkedSetMultiMap<FqName, PsiNamedElement>()
-        val lateWrite = arrayListOf<() -> Unit>()
+        val lateRefWrites = arrayListOf<Pair<Int, () -> Unit>>()
         pFile.process r@{ kRef: KtNameReferenceExpression ->
             val kRefParent = kRef.parent
             if (kRefParent is KtSuperExpression) return@r
@@ -254,33 +258,16 @@ class KotlinRemapper : JvmRemapper<KtFile>(regex, { it as? KtFile }) {
                     }
 
                     val newTargetName = remap(pSafeParent, pTarget) ?: return@t
+                    val newTargetNameName = Name.guessByFirstCharacter(newTargetName)
 
-                    var isGetSet = false
-                    var prefix = ""
-                    if (newTargetName.startsWith("get") && !pTarget.hasParameters()) {
-                        isGetSet = true
-                        prefix = "get"
-                    } else if (newTargetName.startsWith("is") && !pTarget.hasParameters() && pTarget.returnType == PsiTypes.booleanType()) {
-                        isGetSet = true
-                    } else if (newTargetName.startsWith("set") && pTarget.parameterList.parametersCount == 1 && pTarget.returnType == PsiTypes.voidType()) {
-                        isGetSet = true
-                        prefix = "set"
-                    }
+                    var newTargetSetter = propertyNamesBySetMethodName(newTargetNameName).firstOrNull()?.asString()
+                    if (pTarget.parameterList.parametersCount != 1 || pTarget.returnType != PsiTypes.voidType()) newTargetSetter = null
 
-                    // TODO: solve more get/set bullshit
-                    if (isGetSet && kRefParent is KtCallExpression) {
-                        lateWrite.add w@{
-                            val kArg = kRefParent.valueArguments.firstOrNull() ?: return@w
-                            val newTargetNameSansPrefix = newTargetName.removePrefix(prefix).decapitalize()
-
-                            if (prefix == "set") {
-                                kRefParent.replace(factory.createExpression("$newTargetNameSansPrefix = ${kArg.text}"))
-                            } else {
-                                kRefParent.replace(factory.createExpression(newTargetNameSansPrefix))
-                            }
-                        }
-                    } else if (!isGetSet && kRefParent is KtBinaryExpression) {
-                        lateWrite.add w@{
+                    // TODO: more robust handling
+                    if (newTargetSetter == null && kRefParent is KtBinaryExpression && kRefParent.operationToken == KtTokens.EQ && kRefParent.left == kRef) {
+                        // from setter to function call
+                        // TODO: +=, -= and co
+                        lateRefWrites.add(kRefParent.depth to w@{
                             val kLeft = kRefParent.left ?: return@w
                             val kRight = kRefParent.right ?: return@w
 
@@ -295,14 +282,35 @@ class KotlinRemapper : JvmRemapper<KtFile>(regex, { it as? KtFile }) {
                             }
 
                             kRefParent.replace(factory.createExpression(callText))
-                        }
-                    } else if (isGetSet) {
-                        val newTargetNameSansPrefix = newTargetName.removePrefix(prefix).decapitalize()
-                        write { pRef.handleElementRename(newTargetNameSansPrefix) }
-                    } else {
-                        write { pRef.handleElementRename(newTargetName) }
+                        })
+                        return@t
+                    }
+                    if (newTargetSetter != null && kRefParent is KtCallExpression) {
+                        // from function call to setter
+                        lateRefWrites.add(kRefParent.depth to w@{
+                            val kArg = kRefParent.valueArguments.firstOrNull() ?: return@w
+                            kRefParent.replace(factory.createExpression("$newTargetSetter = ${kArg.text}"))
+                        })
+                        return@t
                     }
 
+                    var newTargetGetter = propertyNameByGetMethodName(newTargetNameName)?.asString()
+                    if (pTarget.hasParameters() || pTarget.returnType == PsiTypes.voidType()) newTargetGetter = null
+
+                    if (newTargetGetter == null && pTarget.canHaveSyntheticGetter) {
+                        // from getter to function call
+                        lateRefWrites.add(kRef.depth to w@{ kRef.replace(factory.createExpression("${newTargetName}()")) })
+                        return@t
+                    }
+                    if (newTargetGetter != null && kRefParent is KtCallExpression) {
+                        // from function call to getter
+                        lateRefWrites.add(kRef.depth to w@{ kRef.replace(factory.createExpression(newTargetGetter)) })
+                        return@t
+                    }
+
+                    // from getter/setter to getter/setter or function call to function call
+                    val newTargetAccessor = newTargetSetter ?: newTargetGetter ?: newTargetName
+                    write { pRef.handleElementRename(newTargetAccessor) }
                     return@t
                 }
 
@@ -322,9 +330,8 @@ class KotlinRemapper : JvmRemapper<KtFile>(regex, { it as? KtFile }) {
             val newClassName = mTree.getClass(staticTargetClassName)?.newPkgPeriodName ?: return@r
             val newPackageName = newClassName.substringBeforeLast('.')
             write { kDot.replace(factory.createExpression(newPackageName)) }
-
-            lateWrite.forEach { write(it) }
         }
+        lateRefWrites.sortedByDescending { it.first }.forEach { write(it.second) }
 
         pFile.process i@{ kImport: KtImportDirective ->
             val kRefExp = kImport.importedReference ?: return@i
