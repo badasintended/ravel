@@ -1,6 +1,6 @@
 <!-- Keep a Changelog guide -> https://keepachangelog.com -->
 
-# ravel Changelog
+# Ravel Changelog
 
 ## 0.2.0
 - Initial support for remapping Kotlin sources

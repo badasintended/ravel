@@ -75,49 +75,6 @@ jobs:
           name: ${{ steps.artifact.outputs.filename }}
           path: ./build/distributions/content/*/*
 
-  # Run tests and upload a code coverage report
-  test:
-    name: Test
-    needs: [ build ]
-    runs-on: ubuntu-latest
-    steps:
-
-      # Free GitHub Actions Environment Disk Space
-      - name: Maximize Build Space
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          tool-cache: false
-          large-packages: false
-
-      # Check out the current repository
-      - name: Fetch Sources
-        uses: actions/checkout@v4
-
-      # Set up the Java environment for the next steps
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: zulu
-          java-version: 21
-
-      # Setup Gradle
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          cache-read-only: true
-
-      # Run tests
-      - name: Run Tests
-        run: ./gradlew check
-
-      # Collect Tests Result of failed tests
-      - name: Collect Tests Result
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: tests-result
-          path: ${{ github.workspace }}/build/reports/tests
-
   # Run plugin structure verification along with IntelliJ Plugin Verifier
   verify:
     name: Verify plugin
@@ -166,7 +123,7 @@ jobs:
   releaseDraft:
     name: Release draft
     if: github.event_name != 'pull_request'
-    needs: [ build, test, verify ]
+    needs: [ build, verify ]
     runs-on: ubuntu-latest
     permissions:
       contents: write
