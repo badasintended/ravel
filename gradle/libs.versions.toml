@@ -1,5 +1,5 @@
 [versions]
-ravel = "0.2.0"
+ravel = "0.2.1"
 
 changelog = "2.4.0"
 intellij-platform = "2.10.4"
