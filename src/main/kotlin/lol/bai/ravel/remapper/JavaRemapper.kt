@@ -10,7 +10,7 @@ import lol.bai.ravel.psi.jvmName
 import lol.bai.ravel.psi.jvmRaw
 import lol.bai.ravel.util.linkedSetMultiMap
 
-private val regex = Regex(".*\\.java")
+private val regex = Regex("^.*\\.java$")
 
 open class JavaRemapper : JvmRemapper<PsiJavaFile>(regex, { it as? PsiJavaFile }) {
     private val logger = thisLogger()

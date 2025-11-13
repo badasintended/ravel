@@ -21,7 +21,7 @@ import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.containingClassOrObject
 import org.jetbrains.kotlin.psi.psiUtil.isImportDirectiveExpression
 
-private val regex = Regex(".*\\.kt")
+private val regex = Regex("^.*\\.kt$")
 
 // TODO: handle @JvmName
 class KotlinRemapper : JvmRemapper<KtFile>(regex, { it as? KtFile }) {

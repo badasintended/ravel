@@ -7,7 +7,7 @@
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.java</depends>
 
-    <depends optional="true" config-file="lol.bai.ravel-withKotlin.xml">
+    <depends optional="true" config-file="lol.bai.ravel-kotlin.xml">
         org.jetbrains.kotlin
     </depends>
 

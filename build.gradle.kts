@@ -1,5 +1,6 @@
 import org.jetbrains.changelog.Changelog
 import org.jetbrains.changelog.markdownToHTML
+import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
 plugins {
@@ -35,15 +36,15 @@ dependencies {
     testImplementation(libs.opentest4j)
 
     intellijPlatform {
-        create("IC", "2025.1.5")
+        create {
+            type = IntelliJPlatformType.IntellijIdeaCommunity
+            version = libs.versions.intellij.idea
+        }
 
         // https://plugins.jetbrains.com/docs/intellij/plugin-dependencies.html
-        bundledPlugins(
-            "com.intellij.java",
-            "org.jetbrains.kotlin",
-        )
-        plugins()
-        bundledModules()
+        bundledPlugin("com.intellij.java")
+        bundledPlugin("org.jetbrains.kotlin")
+
         testFramework(TestFrameworkType.Platform)
     }
 }

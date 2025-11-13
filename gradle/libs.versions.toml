@@ -3,6 +3,7 @@ ravel = "0.2.0"
 
 changelog = "2.4.0"
 intellij-platform = "2.10.4"
+intellij-idea = "2025.1.5"
 junit = "4.13.2"
 kotlin = "2.1.20"
 mapping-io = "0.7.1"
