@@ -1,5 +1,6 @@
 package lol.bai.ravel.ui
 
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
@@ -16,9 +17,15 @@ import com.intellij.platform.ide.progress.ModalTaskOwner
 import com.intellij.platform.ide.progress.TaskCancellation
 import com.intellij.platform.ide.progress.withModalProgress
 import com.intellij.ui.CollectionComboBoxModel
+import com.intellij.ui.CollectionListModel
+import com.intellij.ui.ListSpeedSearch
+import com.intellij.ui.ToolbarDecorator
+import com.intellij.ui.components.JBList
+import com.intellij.ui.dsl.builder.LabelPosition
 import com.intellij.ui.dsl.builder.bindItem
 import com.intellij.ui.dsl.builder.bindText
 import com.intellij.ui.dsl.builder.panel
+import com.intellij.util.ui.JBUI
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -33,6 +40,7 @@ import net.fabricmc.mappingio.MappingReader
 import net.fabricmc.mappingio.adapter.MappingSourceNsSwitch
 import net.fabricmc.mappingio.tree.MemoryMappingTree
 import java.nio.file.Path
+import javax.swing.ListSelectionModel
 import javax.swing.SwingUtilities
 import kotlin.io.path.Path
 
@@ -98,26 +106,28 @@ class DownloadMappingAction : AddMappingAction() {
 
         var downloadDir = getUserDownloadsDir().toCanonicalPath()
         var selectedDownloader: MappingDownloader? = null
-        val versionModel = CollectionComboBoxModel<String>()
+
+        val versionModel = CollectionListModel<String>()
+        val versionList = JBList(versionModel).apply {
+            selectionMode = ListSelectionModel.SINGLE_SELECTION
+        }
 
         val ok = DialogBuilder(project)
             .title(B("dialog.mapping.download.title"))
             .centerPanel(panel {
                 val downloaderModel = CollectionComboBoxModel(downloaders, null)
                 val downloaderCb = ComboBox(downloaderModel)
-                val versionCb = ComboBox(versionModel)
 
                 downloaderCb.addActionListener {
                     val newDownloader = downloaderModel.selected
                     if (selectedDownloader != newDownloader && newDownloader != null) {
                         val service = S<GetVersionService>()
-                        versionModel.selectedItem = B("dialog.mapping.download.version.pending")
+                        versionList.setSelectedValue(null, true)
                         versionModel.removeAll()
-                        versionCb.isEnabled = false
+                        versionList.setEmptyText(B("dialog.mapping.download.version.pending"))
                         service.getVersion(newDownloader) {
                             versionModel.add(it)
-                            versionCb.isEnabled = true
-                            versionModel.selectedItem = it.firstOrNull()
+                            versionList.setSelectedValue(it.firstOrNull(), true)
                         }
                     }
                     selectedDownloader = newDownloader ?: selectedDownloader
@@ -128,13 +138,23 @@ class DownloadMappingAction : AddMappingAction() {
                         .bindText({ downloadDir }, { downloadDir = it })
                 }
                 row(B("dialog.mapping.download.type")) { cell(downloaderCb) }
-                row(B("dialog.mapping.download.version")) { cell(versionCb) }
+                row {
+                    val search = ListSpeedSearch.installOn(versionList)
+                    val pane = ToolbarDecorator.createDecorator(versionList)
+                        .setPreferredSize(JBUI.size(350))
+                        .setAddIcon(AllIcons.Actions.Search)
+                        .setAddAction { search.showPopup() }
+                        .disableRemoveAction()
+                        .disableUpDownActions()
+                        .createPanel()
+                    cell(pane).label(B("dialog.mapping.download.version"), LabelPosition.TOP)
+                }
             })
             .showAndGet()
 
         if (!ok) return
         val downloader = selectedDownloader ?: return
-        val version = versionModel.selected ?: return
+        val version = versionList.selectedValue ?: return
 
         currentThreadCoroutineScope().launch {
             val (name, extension) = downloader.resolveDest(version)
@@ -159,5 +179,3 @@ class DownloadMappingAction : AddMappingAction() {
     }
 
 }
-
-

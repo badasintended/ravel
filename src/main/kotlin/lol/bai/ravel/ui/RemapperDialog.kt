@@ -64,6 +64,7 @@ class RemapperDialog(
         }
         moduleList = ModuleList(moduleModel)
         modulesLabel.text = B("dialog.remapper.modules", model.modules.size, moduleModel.size)
+        ListSpeedSearch.installOn(moduleList)
         val modules = ToolbarDecorator
             .createDecorator(moduleList)
             .setPreferredSize(JBUI.size(400, 500))
