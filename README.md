@@ -39,14 +39,7 @@ Supports remapping:
    <img src="https://github.com/badasintended/ravel/blob/master/docs/dialog.png?raw=true" width="400" alt="Remapper Dialog">    
    Here, I want to remap Fabric API from Yarn to Mojang Mappings, as there is no direct
    Yarn-to-Mojang mappings, I need to put both Yarn-merged TinyV2 mapping and Mojang ProGuard TXT
-   mapping as the input.
-
-    - Download Yarn mappings from https://maven.fabricmc.net/net/fabricmc/yarn/, download the `mergedv2.jar`,
-      extract it as a ZIP, and select the `mappings/mappings.tiny` file.
-    - Download Mojang mappings from searching the Minecraft version on
-      https://piston-meta.mojang.com/mc/game/version_manifest_v2.json, open the JSON url, search for `client_mappings`,
-      and download the `client.txt`
-
+   mapping as the input.    
    Select the source and destination namespace as you see fit.
 
 4. Click OK and wait for the remapping to be done

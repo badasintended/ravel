@@ -119,6 +119,7 @@ intellijPlatform {
 changelog {
     groups.empty()
     repositoryUrl = "https://github.com/badasintended/ravel"
+    versionPrefix = ""
 }
 
 tasks {
