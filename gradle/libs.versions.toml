@@ -17,6 +17,7 @@ kotlin-compiler = { group = "org.jetbrains.kotlin", name = "kotlin-compiler", ve
 mapping-io = { group = "net.fabricmc", name = "mapping-io", version.ref = "mapping-io" }
 opentest4j = { group = "org.opentest4j", name = "opentest4j", version.ref = "opentest4j" }
 
+
 [plugins]
 changelog = { id = "org.jetbrains.changelog", version.ref = "changelog" }
 intellij-platform = { id = "org.jetbrains.intellij.platform", version.ref = "intellij-platform" }

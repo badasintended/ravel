@@ -20,16 +20,30 @@
             <add-to-group group-id="RefactoringMenu"/>
         </action>
 
-        <action id="lol.bai.ravel.ui.RemapperDialog$MarkAllAction"
-                class="lol.bai.ravel.ui.RemapperDialog$MarkAllAction"
+        <group id="lol.bai.ravel.ui.MappingActionGroup"
+               class="lol.bai.ravel.ui.MappingActionGroup"
+               icon="AllIcons.General.Add"
+               popup="true">
+
+            <action id="lol.bai.ravel.ui.AddMappingAction"
+                    class="lol.bai.ravel.ui.AddMappingAction"
+                    icon="AllIcons.FileTypes.AddAny"/>
+
+            <action id="lol.bai.ravel.ui.DownloadMappingAction"
+                    class="lol.bai.ravel.ui.DownloadMappingAction"
+                    icon="AllIcons.Actions.Download"/>
+        </group>
+
+        <action id="lol.bai.ravel.ui.MarkAllModuleAction"
+                class="lol.bai.ravel.ui.MarkAllModuleAction"
                 icon="AllIcons.Actions.AddList"/>
 
-        <action id="lol.bai.ravel.ui.RemapperDialog$MarkAction"
-                class="lol.bai.ravel.ui.RemapperDialog$MarkAction"
+        <action id="lol.bai.ravel.ui.MarkModuleAction"
+                class="lol.bai.ravel.ui.MarkModuleAction"
                 icon="AllIcons.General.Add"/>
 
-        <action id="lol.bai.ravel.ui.RemapperDialog$UnMarkAction"
-                class="lol.bai.ravel.ui.RemapperDialog$UnMarkAction"
+        <action id="lol.bai.ravel.ui.UnmarkModuleAction"
+                class="lol.bai.ravel.ui.UnmarkModuleAction"
                 icon="AllIcons.General.Remove"/>
     </actions>
 
@@ -39,21 +53,24 @@
 
     <extensionPoints>
         <extensionPoint name="remapper"
-                        beanClass="lol.bai.ravel.remapper.RemapperBean"
+                        beanClass="lol.bai.ravel.util.ExtensionBean"
                         dynamic="true">
             <with attribute="implementation" implements="lol.bai.ravel.remapper.Remapper"/>
+        </extensionPoint>
+
+        <extensionPoint name="mappingDownloader"
+                        beanClass="lol.bai.ravel.util.ExtensionBean"
+                        dynamic="true">
+            <with attribute="implementation" implements="lol.bai.ravel.mapping.downloader.MappingDownloader"/>
         </extensionPoint>
     </extensionPoints>
 
     <extensions defaultExtensionNs="lol.bai.ravel">
-        <remapper id="mixin"
-                  implementation="lol.bai.ravel.remapper.MixinRemapper"
-                  order="first"/>
+        <remapper id="mixin" implementation="lol.bai.ravel.remapper.MixinRemapper" order="first"/>
+        <remapper id="java" implementation="lol.bai.ravel.remapper.JavaRemapper"/>
+        <remapper id="class-tweaker" implementation="lol.bai.ravel.remapper.ClassTweakerRemapper"/>
 
-        <remapper id="java"
-                  implementation="lol.bai.ravel.remapper.JavaRemapper"/>
-
-        <remapper id="class-tweaker"
-                  implementation="lol.bai.ravel.remapper.ClassTweakerRemapper"/>
+        <mappingDownloader id="yarn" implementation="lol.bai.ravel.mapping.downloader.YarnDownloader"/>
+        <mappingDownloader id="mojmap" implementation="lol.bai.ravel.mapping.downloader.MojMapDownloader"/>
     </extensions>
 </idea-plugin>

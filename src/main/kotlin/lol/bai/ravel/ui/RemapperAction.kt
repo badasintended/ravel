@@ -22,8 +22,7 @@ import kotlinx.coroutines.launch
 import lol.bai.ravel.mapping.MappingTree
 import lol.bai.ravel.mapping.MioClassMapping
 import lol.bai.ravel.mapping.MioMappingConfig
-import lol.bai.ravel.remapper.Remapper
-import lol.bai.ravel.util.B
+import lol.bai.ravel.remapper.RemapperExtension
 import lol.bai.ravel.util.listMultiMap
 
 data class RemapperModel(
@@ -93,7 +92,7 @@ class RemapperAction : AnAction() {
                 readActionBlocking r@{
                     if (!vf.isFile) return@r true
 
-                    for (remapper in Remapper.createInstances()) {
+                    for (remapper in RemapperExtension.createInstances()) {
                         if (!remapper.regex.matches(vf.name)) continue
 
                         val scope = module.getModuleWithDependenciesAndLibrariesScope(true)
