@@ -71,6 +71,7 @@ private object Point {
     val INVOKES = setOf(INVOKE, INVOKE_ASSIGN, INVOKE_STRING)
 }
 
+class MixinRemapperFactory : ConstRemapperFactory(::MixinRemapper, "java")
 class MixinRemapper : JavaRemapper() {
 
     private val logger = thisLogger()

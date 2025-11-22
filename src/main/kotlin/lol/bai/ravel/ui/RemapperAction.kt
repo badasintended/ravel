@@ -68,33 +68,42 @@ class RemapperAction : AnAction() {
             mTree.putClass(MioClassMapping(model.mappings, it))
         }
 
+        data class Target(
+            val vf: VirtualFile,
+            val module: Module,
+            val remappers: List<Remapper>,
+        )
+
         progress.fraction(null)
         progress.text(B("progress.fileTraverse"))
-        val files = arrayListOf<Pair<VirtualFile, Module>>()
+        val factories = RemapperExtension.createInstances()
+        val targets = arrayListOf<Target>()
         for (module in model.modules) {
             for (root in module.rootManager.sourceRoots) {
-                VfsUtil.iterateChildrenRecursively(root, null) {
-                    if (it.isFile) files.add(it to module)
+                VfsUtil.iterateChildrenRecursively(root, null) v@{ vf ->
+                    if (!vf.isFile) return@v true
+                    val remappers = factories
+                        .filter { it.matches(vf.extension ?: "") }
+                        .map { it.create() }
+                    if (remappers.isNotEmpty()) targets.add(Target(vf, module, remappers))
                     true
                 }
             }
         }
 
-        var fileCount = files.size
+        var fileCount = targets.size
         var fileIndex = 0
         val fileWriters = listMultiMap<VirtualFile, () -> Unit>()
         var writersCount = 0
 
-        for ((vf, module) in files) {
+        for ((vf, module, remappers) in targets) {
             progress.fraction(fileIndex.toDouble() / fileCount.toDouble())
             progress.text(B("progress.resolving", writersCount, fileIndex, fileCount))
             progress.details(vf.path)
             fileIndex++
 
             if (!vf.isFile) continue
-            for (remapper in RemapperExtension.createInstances()) readActionBlocking r@{
-                if (!remapper.regex.matches(vf.name)) return@r
-
+            for (remapper in remappers) readActionBlocking r@{
                 val scope = module.getModuleWithDependenciesAndLibrariesScope(true)
                 val write = Remapper.Write { writer ->
                     fileWriters.put(vf, writer)

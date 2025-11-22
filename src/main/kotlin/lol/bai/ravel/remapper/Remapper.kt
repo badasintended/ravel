@@ -6,11 +6,19 @@ import com.intellij.psi.search.GlobalSearchScope
 import lol.bai.ravel.mapping.MappingTree
 import lol.bai.ravel.util.Extension
 
-val RemapperExtension = Extension<Remapper>("lol.bai.ravel.remapper")
+val RemapperExtension = Extension<RemapperFactory>("lol.bai.ravel.remapper")
 
-abstract class Remapper(
-    val regex: Regex
-) {
+abstract class RemapperFactory(
+    val create: () -> Remapper,
+    val matches: (String) -> Boolean,
+)
+
+abstract class ConstRemapperFactory(
+    create: () -> Remapper,
+    extension: String,
+) : RemapperFactory(create, { it == extension })
+
+abstract class Remapper {
     protected lateinit var project: Project
     protected lateinit var scope: GlobalSearchScope
     protected lateinit var mTree: MappingTree

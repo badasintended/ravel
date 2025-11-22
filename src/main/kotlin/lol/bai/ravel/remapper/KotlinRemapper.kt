@@ -22,10 +22,9 @@ import org.jetbrains.kotlin.psi.psiUtil.containingClassOrObject
 import org.jetbrains.kotlin.psi.psiUtil.isImportDirectiveExpression
 import org.jetbrains.kotlin.psi.psiUtil.quoteIfNeeded
 
-private val regex = Regex("^.*\\.kt$")
-
 // TODO: handle @JvmName
-class KotlinRemapper : JvmRemapper<KtFile>(regex, { it as? KtFile }) {
+class KotlinRemapperFactory: ConstRemapperFactory(::KotlinRemapper, "kt")
+class KotlinRemapper : JvmRemapper<KtFile>({ it as? KtFile }) {
 
     private val logger = thisLogger()
 

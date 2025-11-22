@@ -4,7 +4,6 @@ import com.intellij.openapi.vfs.writeText
 import kotlin.io.path.readLines
 import kotlin.io.path.useLines
 
-private val regex = Regex(".*")
 private const val accessWidener = "accessWidener"
 private const val classTweaker = "classTweaker"
 
@@ -16,7 +15,14 @@ private object Entry {
     val injectInterface = Regex("^([\\w-]*inject-interface\\s+)([\\w/$]+)(\\s+)([\\w/$]+)(.*)")
 }
 
-class ClassTweakerRemapper : Remapper(regex) {
+private val skip = setOf(
+    "json", "yaml", "yml", "properties", "toml",
+    "java", "kt", "scala", "groovy",
+    "png", "jpg", "jpeg", "svg", "ogg", "wav"
+)
+
+class ClassTweakerRemapperFactory : RemapperFactory(::ClassTweakerRemapper, { !skip.contains(it) })
+class ClassTweakerRemapper : Remapper() {
 
     private lateinit var lines: List<String>
     override fun stages() = listOf(remapClassTweakers)

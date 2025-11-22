@@ -55,7 +55,7 @@
         <extensionPoint name="remapper"
                         beanClass="lol.bai.ravel.util.ExtensionBean"
                         dynamic="true">
-            <with attribute="implementation" implements="lol.bai.ravel.remapper.Remapper"/>
+            <with attribute="implementation" implements="lol.bai.ravel.remapper.RemapperFactory"/>
         </extensionPoint>
 
         <extensionPoint name="mappingDownloader"
@@ -66,9 +66,9 @@
     </extensionPoints>
 
     <extensions defaultExtensionNs="lol.bai.ravel">
-        <remapper id="mixin" implementation="lol.bai.ravel.remapper.MixinRemapper" order="first"/>
-        <remapper id="java" implementation="lol.bai.ravel.remapper.JavaRemapper"/>
-        <remapper id="class-tweaker" implementation="lol.bai.ravel.remapper.ClassTweakerRemapper"/>
+        <remapper id="mixin" implementation="lol.bai.ravel.remapper.MixinRemapperFactory" order="first"/>
+        <remapper id="java" implementation="lol.bai.ravel.remapper.JavaRemapperFactory"/>
+        <remapper id="class-tweaker" implementation="lol.bai.ravel.remapper.ClassTweakerRemapperFactory"/>
 
         <mappingDownloader id="yarn" implementation="lol.bai.ravel.mapping.downloader.YarnDownloader"/>
         <mappingDownloader id="mojmap" implementation="lol.bai.ravel.mapping.downloader.MojMapDownloader"/>

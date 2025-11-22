@@ -6,10 +6,8 @@ import com.intellij.psi.PsiManager
 import com.intellij.psi.util.PsiTreeUtil
 
 abstract class PsiRemapper<F : PsiFile>(
-    regex: Regex,
     val caster: (PsiFile?) -> F?,
-) : Remapper(regex) {
-
+) : Remapper() {
     protected lateinit var pFile: F
 
     override fun init(): Boolean {
@@ -21,12 +19,10 @@ abstract class PsiRemapper<F : PsiFile>(
     abstract fun comment(pElt: PsiElement, comment: String)
     override fun fileComment(comment: String) = comment(pFile, comment)
 
-    protected inline fun <reified E : PsiElement> psiStage(crossinline action: (E) -> Unit): Stage = object : Stage {
-        override fun invoke() {
-            PsiTreeUtil.processElements(pFile, E::class.java) {
-                action(it)
-                true
-            }
+    protected inline fun <reified E : PsiElement> psiStage(crossinline action: (E) -> Unit): Stage = Stage {
+        PsiTreeUtil.processElements(pFile, E::class.java) {
+            action(it)
+            true
         }
     }
 
@@ -35,5 +31,4 @@ abstract class PsiRemapper<F : PsiFile>(
     }
 
     protected val PsiElement.depth get() = PsiTreeUtil.getDepth(this, null)
-
 }

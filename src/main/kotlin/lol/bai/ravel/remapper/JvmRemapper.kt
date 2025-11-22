@@ -5,9 +5,8 @@ import com.intellij.psi.*
 import lol.bai.ravel.psi.jvmDesc
 
 abstract class JvmRemapper<F : PsiClassOwner>(
-    regex: Regex,
     caster: (PsiFile?) -> F?
-) : PsiRemapper<F>(regex, caster) {
+) : PsiRemapper<F>(caster) {
     private val logger = thisLogger()
 
     protected fun remap(pField: PsiField): String? {
