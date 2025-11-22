@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+## [0.3.1]
+
+- Java: fix parameter types not getting remapped
+- Mixin: remove `remap=false` check, try to remap the target anyway
+- Kotlin: more robust Java property access remap
+
 ## [0.3.0]
 
 - Added mappings downloader, currently supports downloading Yarn and Mojang Mappings
@@ -30,7 +36,8 @@
 
 - Initial release
 
-[Unreleased]: https://github.com/badasintended/ravel/compare/0.3.0...HEAD
+[Unreleased]: https://github.com/badasintended/ravel/compare/0.3.1...HEAD
+[0.3.1]: https://github.com/badasintended/ravel/compare/0.3.0...0.3.1
 [0.3.0]: https://github.com/badasintended/ravel/compare/0.2.1...0.3.0
 [0.2.1]: https://github.com/badasintended/ravel/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/badasintended/ravel/compare/0.1.1...0.2.0
