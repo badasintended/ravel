@@ -75,12 +75,6 @@ class MixinRemapper : JavaRemapper() {
 
     private val logger = thisLogger()
 
-    private fun isRemapped(pAnnotation: PsiAnnotation): Boolean {
-        val pRemap = pAnnotation.findAttributeValue("remap") ?: return true
-        pRemap as PsiLiteralExpression
-        return pRemap.value as Boolean
-    }
-
     private fun splitClassMember(classMember: String): Pair<String?, String> {
         if (classMember.startsWith('L')) {
             // Lpath/to/Class;method()V
@@ -131,8 +125,6 @@ class MixinRemapper : JavaRemapper() {
         }
 
         if (annotationName == Mixin) {
-            if (!isRemapped(pAnnotation)) return@a
-
             fun remapTarget(pTarget: PsiLiteralExpression) {
                 var target = pTarget.value as String
                 target = target.replace('.', '/')
@@ -201,7 +193,6 @@ class MixinRemapper : JavaRemapper() {
         }
 
         if (annotationName == Invoker) {
-            if (!isRemapped(pAnnotation)) return@a
             val pMethod = pAnnotation.parent<PsiMethod>() ?: return@a
             val methodName = pMethod.name
             val (pTargetClass, mTargetClass) = targetClass(pMethod) ?: return@a
@@ -249,7 +240,6 @@ class MixinRemapper : JavaRemapper() {
         }
 
         if (annotationName == Accessor) {
-            if (!isRemapped(pAnnotation)) return@a
             val pMethod = pAnnotation.parent<PsiMethod>() ?: return@a
             val methodName = pMethod.name
             val mTargetClass = targetClass(pMethod)?.second ?: return@a
@@ -288,7 +278,6 @@ class MixinRemapper : JavaRemapper() {
         }
 
         if (INJECTS.contains(annotationName)) {
-            if (!isRemapped(pAnnotation)) return@a
             val pMethod = pAnnotation.parent<PsiMethod>() ?: return@a
             val methodName = pMethod.name
 
@@ -471,7 +460,6 @@ class MixinRemapper : JavaRemapper() {
         }
 
         if (annotationName == Definition) {
-            if (!isRemapped(pAnnotation)) return@a
             val pMethod = pAnnotation.parent<PsiMethod>() ?: return@a
 
             fun remapTarget(pTargetElt: PsiElement, key: String, remap: (PsiMethod, String, String) -> Unit) = when (pTargetElt) {
@@ -493,7 +481,6 @@ class MixinRemapper : JavaRemapper() {
         }
 
         if (annotationName == At) {
-            if (!isRemapped(pAnnotation)) return@a
             val pMethod = pAnnotation.parent<PsiMethod>() ?: return@a
             val methodName = pMethod.name
 
@@ -554,7 +541,6 @@ class MixinRemapper : JavaRemapper() {
         }
 
         if (annotationName == Shadow || annotationName == Overwrite) {
-            if (!isRemapped(pAnnotation)) return@a
             val pMember = pAnnotation.parent<PsiMember>() ?: return@a
             val memberName = pMember.name ?: return@a
 
