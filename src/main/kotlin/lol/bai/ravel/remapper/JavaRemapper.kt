@@ -44,7 +44,7 @@ open class JavaRemapper : JvmRemapper<PsiJavaFile>(regex, { it as? PsiJavaFile }
     }
 
     protected open inner class JavaStage: JavaRecursiveElementWalkingVisitor(), Stage {
-        override fun run() = pFile.accept(this)
+        override fun invoke() = pFile.accept(this)
     }
 
     override fun stages() = listOf<Stage>(

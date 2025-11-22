@@ -15,10 +15,10 @@ abstract class Remapper(
     protected lateinit var scope: GlobalSearchScope
     protected lateinit var mTree: MappingTree
     protected lateinit var file: VirtualFile
-    protected lateinit var write: Writer
+    protected lateinit var write: Write
 
     protected abstract fun init(): Boolean
-    fun init(project: Project, scope: GlobalSearchScope, mTree: MappingTree, file: VirtualFile, write: Writer): Boolean {
+    fun init(project: Project, scope: GlobalSearchScope, mTree: MappingTree, file: VirtualFile, write: Write): Boolean {
         this.project = project
         this.scope = scope
         this.mTree = mTree
@@ -30,12 +30,12 @@ abstract class Remapper(
     abstract fun fileComment(comment: String)
     abstract fun stages(): List<Stage>
 
-    interface Stage {
-        fun run()
+    fun interface Stage {
+        operator fun invoke()
     }
 
-    protected fun stage(runner: () -> Unit) = object : Stage {
-        override fun run() = runner()
+    fun interface Write {
+        operator fun invoke(writer: () -> Unit)
     }
 }
 

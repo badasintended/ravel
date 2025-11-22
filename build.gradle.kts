@@ -141,7 +141,7 @@ tasks {
         })
     }
 
-    register("publish") {
+    val publish by registering {
         dependsOn(publishPlugin, publishGithub)
     }
 }

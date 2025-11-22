@@ -136,7 +136,7 @@ class KotlinRemapper : JvmRemapper<KtFile>(regex, { it as? KtFile }) {
     }
 
     private open inner class KotlinStage : KotlinRecursiveElementWalkingVisitor(), Stage {
-        override fun run() = pFile.accept(this)
+        override fun invoke() = pFile.accept(this)
     }
 
     override fun stages() = listOf<Stage>(
@@ -348,9 +348,9 @@ class KotlinRemapper : JvmRemapper<KtFile>(regex, { it as? KtFile }) {
         }
     }
     private val importRemapper = object : KotlinStage() {
-        override fun run() {
+        override fun invoke() {
             lateRefWrites.sortedByDescending { it.first }.forEach { write(it.second) }
-            super.run()
+            super.invoke()
         }
         override fun visitImportDirective(kImport: KtImportDirective) {
             val kRefExp = kImport.importedReference ?: return

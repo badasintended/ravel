@@ -162,6 +162,7 @@ class DownloadMappingAction : AddMappingAction() {
 
             val downloaded = withModalProgress(ModalTaskOwner.project(project), B("dialog.mapping.download.mapping.pending"), TaskCancellation.cancellable()) {
                 downloader.download(version, downloadPath)
+                downloader.download(version, downloadPath)
             }
 
             if (downloaded) withContext(Dispatchers.EDT) {

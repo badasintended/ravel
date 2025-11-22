@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 import lol.bai.ravel.mapping.MappingTree
 import lol.bai.ravel.mapping.MioClassMapping
 import lol.bai.ravel.mapping.MioMappingConfig
+import lol.bai.ravel.remapper.Remapper
 import lol.bai.ravel.remapper.RemapperExtension
 import lol.bai.ravel.util.listMultiMap
 
@@ -73,13 +74,14 @@ class RemapperAction : AnAction() {
                 }
             }
 
-            val fileCount = files.size
-            var fileIndex = 1
+            var fileCount = files.size
+            var fileIndex = 0
             val fileWriters = listMultiMap<VirtualFile, () -> Unit>()
+            var writersCount = 0
 
             for ((vf, module) in files) {
                 p.fraction(fileIndex.toDouble() / fileCount.toDouble())
-                p.text(B("progress.resolving", fileIndex, fileCount))
+                p.text(B("progress.resolving", writersCount, fileIndex, fileCount))
                 p.details(vf.path)
                 fileIndex++
 
@@ -88,13 +90,18 @@ class RemapperAction : AnAction() {
                     if (!remapper.regex.matches(vf.name)) return@r
 
                     val scope = module.getModuleWithDependenciesAndLibrariesScope(true)
-                    val valid = remapper.init(project, scope, mTree, vf) { writer -> fileWriters.put(vf, writer) }
+                    val write = Remapper.Write { writer ->
+                        fileWriters.put(vf, writer)
+                        writersCount++
+                    }
+
+                    val valid = remapper.init(project, scope, mTree, vf, write)
                     if (!valid) return@r
 
                     try {
-                        remapper.stages().forEach { it.run() }
+                        remapper.stages().forEach { it.invoke() }
                     } catch (e: Exception) {
-                        fileWriters.put(vf) { remapper.fileComment("TODO(Ravel): Failed to fully resolve file: ${e.message}") }
+                        write { remapper.fileComment("TODO(Ravel): Failed to fully resolve file: ${e.message}") }
                         logger.error("Failed to fully resolve ${vf.path}", e)
                     }
                 }
@@ -102,15 +109,16 @@ class RemapperAction : AnAction() {
 
             logger.warn("Mapping resolved in ${System.currentTimeMillis() - time}ms")
 
-            val writersCount = fileWriters.values.sumOf { it.size }
-            var writerIndex = 1
+            fileCount = fileWriters.size
+            fileIndex = 0
+            var writerIndex = 0
 
             fileWriters.forEach { (vf, writers) ->
                 p.details(vf.path)
                 writeCommandAction(project, "Ravel Writer") {
                     writers.forEach { writer ->
                         p.fraction(writerIndex.toDouble() / writersCount.toDouble())
-                        p.text(B("progress.writing", writerIndex, writersCount))
+                        p.text(B("progress.writing", writerIndex, writersCount, fileIndex, fileCount))
                         writerIndex++
 
                         try {
@@ -120,6 +128,7 @@ class RemapperAction : AnAction() {
                         }
                     }
                 }
+                fileIndex++
             }
 
             logger.warn("Remap finished in ${System.currentTimeMillis() - time}ms")

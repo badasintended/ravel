@@ -5,8 +5,6 @@ import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiManager
 import com.intellij.psi.util.PsiTreeUtil
 
-typealias Writer = (() -> Unit) -> Unit
-
 abstract class PsiRemapper<F : PsiFile>(
     regex: Regex,
     val caster: (PsiFile?) -> F?,
@@ -24,7 +22,7 @@ abstract class PsiRemapper<F : PsiFile>(
     override fun fileComment(comment: String) = comment(pFile, comment)
 
     protected inline fun <reified E : PsiElement> psiStage(crossinline action: (E) -> Unit): Stage = object : Stage {
-        override fun run() {
+        override fun invoke() {
             PsiTreeUtil.processElements(pFile, E::class.java) {
                 action(it)
                 true

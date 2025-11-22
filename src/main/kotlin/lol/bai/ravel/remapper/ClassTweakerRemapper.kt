@@ -55,7 +55,7 @@ class ClassTweakerRemapper : Remapper(regex) {
     }
 
     override fun stages() = listOf(stage)
-    private val stage = stage() {
+    private val stage = Stage {
         var modified = false
         val sb = StringBuilder()
         val lineIter = lines.iterator()
