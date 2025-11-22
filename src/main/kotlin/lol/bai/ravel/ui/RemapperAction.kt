@@ -114,6 +114,9 @@ class RemapperAction : AnAction() {
         }
 
         logger.warn("Mapping resolved in ${System.currentTimeMillis() - time}ms")
+        progress.fraction(null)
+        progress.text(null)
+        progress.details(null)
 
         fileCount = fileWriters.size
         fileIndex = 0

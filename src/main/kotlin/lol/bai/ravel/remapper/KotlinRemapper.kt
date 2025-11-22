@@ -4,23 +4,23 @@ import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.psi.*
 import lol.bai.ravel.psi.implicitly
 import lol.bai.ravel.psi.jvmName
-import lol.bai.ravel.util.Holder
-import lol.bai.ravel.util.decapitalize
-import lol.bai.ravel.util.held
-import lol.bai.ravel.util.linkedSetMultiMap
+import lol.bai.ravel.util.*
 import org.jetbrains.kotlin.asJava.canHaveSyntheticGetter
 import org.jetbrains.kotlin.asJava.toLightElements
 import org.jetbrains.kotlin.asJava.toLightMethods
 import org.jetbrains.kotlin.idea.base.psi.kotlinFqName
+import org.jetbrains.kotlin.idea.completion.reference
+import org.jetbrains.kotlin.idea.highlighting.analyzers.isCalleeExpression
 import org.jetbrains.kotlin.idea.structuralsearch.visitor.KotlinRecursiveElementWalkingVisitor
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.load.java.propertyNameByGetMethodName
-import org.jetbrains.kotlin.load.java.propertyNamesBySetMethodName
+import org.jetbrains.kotlin.load.java.propertyNameBySetMethodName
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.containingClassOrObject
 import org.jetbrains.kotlin.psi.psiUtil.isImportDirectiveExpression
+import org.jetbrains.kotlin.psi.psiUtil.quoteIfNeeded
 
 private val regex = Regex("^.*\\.kt$")
 
@@ -185,13 +185,32 @@ class KotlinRemapper : JvmRemapper<KtFile>(regex, { it as? KtFile }) {
             lateRefWrites.sortedByDescending { it.first }.forEach { write(it.second) }
         }
 
-        override fun visitReferenceExpression(expression: KtReferenceExpression) {
-            val kRef = expression as? KtNameReferenceExpression ?: return
+        override fun visitArrayAccessExpression(kRef: KtArrayAccessExpression) {
+            val pRef = kRef.reference() ?: return
+            val pTarget = pRef.resolve() as? PsiNamedElement ?: return
+            val pSafeParent = kRef.parent<PsiNamedElement>() ?: pFile
+
+            if (pTarget is PsiMethod) {
+                val newTargetName = remap(pSafeParent, pTarget) ?: return
+                if (newTargetName == "get" || newTargetName == "set") return
+
+                lateRefWrites.add(kRef.depth to w@{
+                    val owner = kRef.arrayExpression?.text ?: return@w
+                    val args = kRef.indexExpressions.joinToString { it.text }
+                    kRef.replace(factory.createExpression("${owner}.${newTargetName}($args)"))
+                })
+                return
+            }
+
+            // TODO: kotlin operator function rename?
+        }
+
+        override fun visitSimpleNameExpression(kRef: KtSimpleNameExpression) {
             val kRefParent = kRef.parent
             if (kRefParent is KtSuperExpression) return
             if (kRefParent is KtThisExpression) return
 
-            val pRef = kRef.reference ?: return
+            val pRef = kRef.reference() ?: return
             val pTarget = pRef.resolve() as? PsiNamedElement ?: return
             val pSafeParent = kRef.parent<PsiNamedElement>() ?: pFile
 
@@ -200,7 +219,7 @@ class KotlinRemapper : JvmRemapper<KtFile>(regex, { it as? KtFile }) {
             var staticTargetClassName: String? = null
             run t@{
                 if (pTarget is KtProperty) {
-                    if (kRef.isImportDirectiveExpression()) return
+                    if (kRef.isImportDirectiveExpression()) return@t
                     if (kDot != null) pTarget.fqName?.let { pMemberImportUsages.put(it, pTarget) }
 
                     if (pTarget.name != kRef.getReferencedName()) return@t
@@ -210,8 +229,21 @@ class KotlinRemapper : JvmRemapper<KtFile>(regex, { it as? KtFile }) {
                     return@t
                 }
 
+                if (pTarget is PsiField) {
+                    if (kRef.isImportDirectiveExpression()) return@t
+                    if (pTarget.implicitly(PsiModifier.STATIC)) {
+                        staticTargetClassName = pTarget.containingClass?.jvmName
+                        if (kDot != null) pTarget.kotlinFqName?.let { pMemberImportUsages.put(it, pTarget) }
+                        if (pTarget.name != kRef.getReferencedName()) return@t
+                    }
+
+                    val newTargetName = remap(pTarget) ?: return@t
+                    write { pRef.handleElementRename(newTargetName) }
+                    return@t
+                }
+
                 if (pTarget is KtParameter) {
-                    if (kRef.isImportDirectiveExpression()) return
+                    if (kRef.isImportDirectiveExpression()) return@t
                     if (!pTarget.hasValOrVar()) return@t
                     if (kDot != null) pTarget.fqName?.let { pMemberImportUsages.put(it, pTarget) }
 
@@ -221,13 +253,121 @@ class KotlinRemapper : JvmRemapper<KtFile>(regex, { it as? KtFile }) {
                     return@t
                 }
 
+                fun remapMethodCall(pMethod: PsiMethod, newTargetName: String) {
+                    val newTargetNameName = Name.guessByFirstCharacter(newTargetName)
+
+                    if ((kRef.parent as? KtCallableReferenceExpression)?.callableReference == kRef) {
+                        write { kRef.replace(factory.createSimpleName(newTargetName.quoteIfNeeded())) }
+                        return
+                    }
+
+                    val isPropertyAccess = !kRef.isCalleeExpression()
+                    var newTargetSetter = propertyNameBySetMethodName(newTargetNameName, pMethod.returnType == PsiTypes.booleanType())?.asString()
+                    if (newTargetSetter != null) {
+                        if (pMethod.parameterList.parametersCount != 1
+                            || pMethod.returnType != PsiTypes.voidType()
+                            || !newTargetSetter.first().isLetter()
+                        ) newTargetSetter = null
+                    }
+                    if (newTargetSetter != null) run m@{
+                        val pSuperMethods = pMethod.findDeepestSuperMethods()
+                        val pOriginalMethod = if (pSuperMethods.size == 1) pSuperMethods.first() else pMethod
+                        val pClass = pOriginalMethod.containingClass ?: return@m
+                        val mClass = mTree.get(pClass) ?: return@m
+
+                        if (mClass.fields.any { it.newName == newTargetSetter }) {
+                            newTargetSetter = null
+                            return@m
+                        }
+
+                        val newTargetGetter =
+                            if (newTargetSetter.startsWith("is")) newTargetSetter
+                            else "get" + newTargetSetter.capitalize()
+                        if (mClass.methods.none { it.newName == newTargetGetter }) {
+                            newTargetSetter = null
+                        }
+                    }
+
+                    // TODO: more robust handling
+                    if (newTargetSetter == null && isPropertyAccess) run s@{
+                        // from setter to function call
+                        var kBinary: KtBinaryExpression =
+                            if (kRefParent is KtBinaryExpression && kRefParent.left == kRef) kRefParent
+                            else {
+                                val kRefGrandParent = kRefParent.parent
+                                if (kRefGrandParent is KtBinaryExpression && kRefGrandParent.left == kRefParent) kRefGrandParent
+                                else return@s
+                            }
+
+                        // TODO: +=, -= and co
+                        if (kBinary.operationToken != KtTokens.EQ) return@s
+
+                        lateRefWrites.add(kBinary.depth to w@{
+                            val kLeft = kBinary.left ?: return@w
+                            val kRight = kBinary.right ?: return@w
+
+                            val receiverText =
+                                if (kLeft is KtDotQualifiedExpression) kLeft.receiverExpression.text
+                                else null
+
+                            val callText = if (receiverText != null) {
+                                "${receiverText}.${newTargetName}(${kRight.text})"
+                            } else {
+                                "${newTargetName}(${kRight.text})"
+                            }
+
+                            kBinary.replace(factory.createExpression(callText))
+                        })
+                        return
+                    }
+                    if (newTargetSetter != null && !isPropertyAccess && kRefParent is KtCallExpression) {
+                        // from function call to setter
+                        lateRefWrites.add(kRefParent.depth to w@{
+                            val kArg = kRefParent.valueArguments.firstOrNull() ?: return@w
+                            kRefParent.replace(factory.createExpression("$newTargetSetter = ${kArg.text}"))
+                        })
+                        return
+                    }
+
+                    var newTargetGetter = propertyNameByGetMethodName(newTargetNameName)?.asString()
+                    if (newTargetGetter != null) {
+                        if (pMethod.hasParameters()
+                            || pMethod.returnType == PsiTypes.voidType()
+                            || !newTargetGetter.first().isLetter()
+                        ) newTargetGetter = null
+                    }
+
+                    if (newTargetGetter == null && isPropertyAccess && pMethod.canHaveSyntheticGetter) {
+                        // from getter to function call
+                        lateRefWrites.add(kRef.depth to { kRef.replace(factory.createExpression("${newTargetName}()")) })
+                        return
+                    }
+                    if (newTargetGetter != null && !isPropertyAccess && kRefParent is KtCallExpression) {
+                        // from function call to getter
+                        lateRefWrites.add(kRefParent.depth to { kRefParent.replace(factory.createExpression(newTargetGetter)) })
+                        return
+                    }
+
+                    // from property access to property access or function call to function call
+                    val newTargetAccessor = newTargetSetter ?: newTargetGetter ?: newTargetName
+                    write { kRef.replace(factory.createSimpleName(newTargetAccessor.quoteIfNeeded())) }
+                }
+
                 if (pTarget is KtNamedFunction) {
-                    if (kRef.isImportDirectiveExpression()) return
+                    if (kRef.isImportDirectiveExpression()) return@t
                     if (kDot != null) pTarget.fqName?.let { pMemberImportUsages.put(it, pTarget) }
 
                     if (pTarget.name != kRef.getReferencedName()) return@t
                     if (pTarget.isTopLevel) staticTargetClassName = pTarget.containingKtFile.jvmName
                     val newTargetName = remap(pSafeParent, pTarget) ?: return@t
+
+                    if (pTarget.hasModifier(KtTokens.OVERRIDE_KEYWORD)) run j@{
+                        val jMethods = pTarget.toLightMethods()
+                        if (jMethods.size != 1) return@j
+
+                        return@t remapMethodCall(jMethods.first(), newTargetName)
+                    }
+
                     write { pRef.handleElementRename(newTargetName) }
                     return@t
                 }
@@ -245,20 +385,7 @@ class KotlinRemapper : JvmRemapper<KtFile>(regex, { it as? KtFile }) {
                 }
 
                 if (pTarget is KtClassOrObject) {
-                    return remapKotlinClass(pTarget)
-                }
-
-                if (pTarget is PsiField) {
-                    if (kRef.isImportDirectiveExpression()) return
-                    if (pTarget.implicitly(PsiModifier.STATIC)) {
-                        staticTargetClassName = pTarget.containingClass?.jvmName
-                        if (kDot != null) pTarget.kotlinFqName?.let { pMemberImportUsages.put(it, pTarget) }
-                        if (pTarget.name != kRef.getReferencedName()) return@t
-                    }
-
-                    val newTargetName = remap(pTarget) ?: return@t
-                    write { pRef.handleElementRename(newTargetName) }
-                    return@t
+                    return@t remapKotlinClass(pTarget)
                 }
 
                 fun remapJavaClass(jClass: PsiClass?) {
@@ -270,7 +397,7 @@ class KotlinRemapper : JvmRemapper<KtFile>(regex, { it as? KtFile }) {
                 }
 
                 if (pTarget is PsiMethod) {
-                    if (kRef.isImportDirectiveExpression()) return
+                    if (kRef.isImportDirectiveExpression()) return@t
                     if (pTarget.isConstructor) return@t remapJavaClass(pTarget.containingClass)
 
                     if (pTarget.implicitly(PsiModifier.STATIC)) {
@@ -280,60 +407,7 @@ class KotlinRemapper : JvmRemapper<KtFile>(regex, { it as? KtFile }) {
                     }
 
                     val newTargetName = remap(pSafeParent, pTarget) ?: return@t
-                    val newTargetNameName = Name.guessByFirstCharacter(newTargetName)
-
-                    var newTargetSetter = propertyNamesBySetMethodName(newTargetNameName).firstOrNull()?.asString()
-                    if (pTarget.parameterList.parametersCount != 1 || pTarget.returnType != PsiTypes.voidType()) newTargetSetter = null
-
-                    // TODO: more robust handling
-                    if (newTargetSetter == null && kRefParent is KtBinaryExpression && kRefParent.operationToken == KtTokens.EQ && kRefParent.left == kRef) {
-                        // from setter to function call
-                        // TODO: +=, -= and co
-                        lateRefWrites.add(kRefParent.depth to w@{
-                            val kLeft = kRefParent.left ?: return@w
-                            val kRight = kRefParent.right ?: return@w
-
-                            val receiverText =
-                                if (kLeft is KtDotQualifiedExpression) kLeft.receiverExpression.text
-                                else null
-
-                            val callText = if (receiverText != null) {
-                                "${receiverText}.${newTargetName}(${kRight.text})"
-                            } else {
-                                "${newTargetName}(${kRight.text})"
-                            }
-
-                            kRefParent.replace(factory.createExpression(callText))
-                        })
-                        return@t
-                    }
-                    if (newTargetSetter != null && kRefParent is KtCallExpression) {
-                        // from function call to setter
-                        lateRefWrites.add(kRefParent.depth to w@{
-                            val kArg = kRefParent.valueArguments.firstOrNull() ?: return@w
-                            kRefParent.replace(factory.createExpression("$newTargetSetter = ${kArg.text}"))
-                        })
-                        return@t
-                    }
-
-                    var newTargetGetter = propertyNameByGetMethodName(newTargetNameName)?.asString()
-                    if (pTarget.hasParameters() || pTarget.returnType == PsiTypes.voidType()) newTargetGetter = null
-
-                    if (newTargetGetter == null && pTarget.canHaveSyntheticGetter) {
-                        // from getter to function call
-                        lateRefWrites.add(kRef.depth to w@{ kRef.replace(factory.createExpression("${newTargetName}()")) })
-                        return@t
-                    }
-                    if (newTargetGetter != null && kRefParent is KtCallExpression) {
-                        // from function call to getter
-                        lateRefWrites.add(kRef.depth to w@{ kRef.replace(factory.createExpression(newTargetGetter)) })
-                        return@t
-                    }
-
-                    // from getter/setter to getter/setter or function call to function call
-                    val newTargetAccessor = newTargetSetter ?: newTargetGetter ?: newTargetName
-                    write { pRef.handleElementRename(newTargetAccessor) }
-                    return@t
+                    return@t remapMethodCall(pTarget, newTargetName)
                 }
 
                 if (pTarget is PsiClass) {
