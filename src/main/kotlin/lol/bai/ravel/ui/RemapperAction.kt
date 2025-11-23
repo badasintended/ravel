@@ -3,8 +3,7 @@ package lol.bai.ravel.ui
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.application.readActionBlocking
-import com.intellij.openapi.command.writeCommandAction
+import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.progress.currentThreadCoroutineScope
@@ -17,14 +16,17 @@ import com.intellij.platform.ide.progress.ModalTaskOwner
 import com.intellij.platform.ide.progress.TaskCancellation
 import com.intellij.platform.ide.progress.withModalProgress
 import com.intellij.platform.util.progress.RawProgressReporter
-import com.intellij.platform.util.progress.reportRawProgress
 import kotlinx.coroutines.launch
 import lol.bai.ravel.mapping.MappingTree
 import lol.bai.ravel.mapping.MioClassMapping
 import lol.bai.ravel.mapping.MioMappingConfig
 import lol.bai.ravel.remapper.Remapper
 import lol.bai.ravel.remapper.RemapperExtension
+import lol.bai.ravel.util.NoInline
 import lol.bai.ravel.util.listMultiMap
+import org.jetbrains.kotlin.asJava.classes.runReadAction
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
 data class RemapperModel(
     val mappings: MutableList<MioMappingConfig> = arrayListOf(),
@@ -51,14 +53,15 @@ class RemapperAction : AnAction() {
 
         currentThreadCoroutineScope().launch {
             withModalProgress(ModalTaskOwner.project(project), B("dialog.remapper.title"), TaskCancellation.nonCancellable()) {
-                reportRawProgress { p ->
-                    remap(project, model, p)
+                suspendCoroutine<Any> { cont ->
+                    NoInline.reportRawProgress(cont) { remap(project, model, it) }
+                    cont.resume(Unit)
                 }
             }
         }
     }
 
-    suspend fun remap(project: Project, model: RemapperModel, progress: RawProgressReporter) {
+    fun remap(project: Project, model: RemapperModel, progress: RawProgressReporter) {
         val time = System.currentTimeMillis()
 
         progress.fraction(null)
@@ -103,21 +106,23 @@ class RemapperAction : AnAction() {
             fileIndex++
 
             if (!vf.isFile) continue
-            for (remapper in remappers) readActionBlocking r@{
+            runReadAction {
                 val scope = module.getModuleWithDependenciesAndLibrariesScope(true)
                 val write = Remapper.Write { writer ->
                     fileWriters.put(vf, writer)
                     writersCount++
                 }
 
-                val valid = remapper.init(project, scope, mTree, vf, write)
-                if (!valid) return@r
+                for (remapper in remappers) {
+                    val valid = remapper.init(project, scope, mTree, vf, write)
+                    if (!valid) continue
 
-                try {
-                    remapper.stages().forEach { it.invoke() }
-                } catch (e: Exception) {
-                    write { remapper.fileComment("TODO(Ravel): Failed to fully resolve file: ${e.message}") }
-                    logger.error("Failed to fully resolve ${vf.path}", e)
+                    try {
+                        remapper.stages().forEach { it.invoke() }
+                    } catch (e: Exception) {
+                        write { remapper.fileComment("TODO(Ravel): Failed to fully resolve file: ${e.message}") }
+                        logger.error("Failed to fully resolve ${vf.path}", e)
+                    }
                 }
             }
         }
@@ -133,7 +138,7 @@ class RemapperAction : AnAction() {
 
         fileWriters.forEach { (vf, writers) ->
             progress.details(vf.path)
-            writeCommandAction(project, "Ravel Writer") {
+            WriteCommandAction.runWriteCommandAction(project, "Ravel Remapper", null, {
                 writers.forEach { writer ->
                     progress.fraction(writerIndex.toDouble() / writersCount.toDouble())
                     progress.text(B("progress.writing", writerIndex, writersCount, fileIndex, fileCount))
@@ -145,7 +150,7 @@ class RemapperAction : AnAction() {
                         logger.error("Failed to write ${vf.path}", e)
                     }
                 }
-            }
+            })
             fileIndex++
         }
 

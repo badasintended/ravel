@@ -19,10 +19,6 @@ data class Holder<T>(val value: T) {
 val <T> T?.held: Holder<T?>
     get() = if (this == null) Holder.nullHolder as Holder<T?> else Holder(this)
 
-fun <T> HolderKey<T>.get(holder: UserDataHolder): Holder<T?>? {
-    return holder.getUserData(this)
-}
-
 fun <T> HolderKey<T>.put(holder: UserDataHolder, value: T?): T? {
     holder.putUserData(this, value.held)
     return value
