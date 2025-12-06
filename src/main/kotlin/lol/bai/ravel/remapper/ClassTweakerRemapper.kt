@@ -21,7 +21,7 @@ private val skip = setOf(
     "png", "jpg", "jpeg", "svg", "ogg", "wav"
 )
 
-class ClassTweakerRemapperFactory : RemapperFactory(::ClassTweakerRemapper, { !skip.contains(it) })
+class ClassTweakerRemapperFactory : RemapperFactory(::ClassTweakerRemapper, { !skip.contains(it.extension) })
 class ClassTweakerRemapper : Remapper() {
 
     private lateinit var lines: List<String>

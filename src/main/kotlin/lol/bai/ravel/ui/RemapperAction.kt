@@ -16,7 +16,6 @@ import com.intellij.platform.ide.progress.ModalTaskOwner
 import com.intellij.platform.ide.progress.TaskCancellation
 import com.intellij.platform.ide.progress.runWithModalProgressBlocking
 import com.intellij.platform.util.progress.RawProgressReporter
-import lol.bai.ravel.mapping.MappingTree
 import lol.bai.ravel.mapping.MioClassMapping
 import lol.bai.ravel.mapping.MioMappingConfig
 import lol.bai.ravel.mapping.MutableMappingTree
@@ -75,34 +74,35 @@ class RemapperAction : AnAction() {
             val factories: List<RemapperFactory>,
         )
 
-        progress.fraction(null)
-        progress.text(B("progress.fileTraverse"))
-        val factories = RemapperExtension.createInstances()
-        val targets = arrayListOf<Target>()
-        for (module in model.modules) {
-            for (root in module.rootManager.sourceRoots) {
-                VfsUtil.iterateChildrenRecursively(root, null) v@{ vf ->
-                    if (!vf.isFile) return@v true
-                    val remappers = factories.filter { it.matches(vf.extension ?: "") }
-                    if (remappers.isNotEmpty()) targets.add(Target(vf, module, remappers))
-                    true
-                }
-            }
-        }
-
-        var fileCount = targets.size
-        var fileIndex = 0
         val fileWriters = listMultiMap<VirtualFile, () -> Unit>()
         var writersCount = 0
 
-        fun remap(mTree: MappingTree, n: Int) {
+        fun resolve(runCxt: Remapper.Rerun.Context, n: Int) {
             val nText = if (n == 1) "" else " ($n)"
 
-            var mTreeRerun: MutableMappingTree? = null
+            var rerunCxt: Remapper.Rerun.Context? = null
             val rerun = Remapper.Rerun { modifier ->
-                if (mTreeRerun == null) mTreeRerun = MutableMappingTree()
-                modifier(mTreeRerun)
+                if (rerunCxt == null) rerunCxt = Remapper.Rerun.Context(MutableMappingTree())
+                modifier(rerunCxt)
             }
+
+            progress.fraction(null)
+            progress.text(B("progress.fileTraverse"))
+            val factories = RemapperExtension.createInstances()
+            val targets = arrayListOf<Target>()
+            for (module in model.modules) {
+                for (root in module.rootManager.sourceRoots) {
+                    VfsUtil.iterateChildrenRecursively(root, null) v@{ vf ->
+                        if (!vf.isFile) return@v true
+                        val remappers = factories.filter { it.matches(vf) }
+                        if (remappers.isNotEmpty()) targets.add(Target(vf, module, remappers))
+                        true
+                    }
+                }
+            }
+
+            val fileCount = targets.size
+            var fileIndex = 0
 
             for ((vf, module, factories) in targets) {
                 progress.fraction(fileIndex.toDouble() / fileCount.toDouble())
@@ -120,7 +120,7 @@ class RemapperAction : AnAction() {
 
                     for (factory in factories) {
                         val remapper = factory.create()
-                        val valid = remapper.init(project, scope, mTree, vf, write, rerun)
+                        val valid = remapper.init(project, scope, runCxt.mTree, vf, write, rerun)
                         if (!valid) continue
 
                         try {
@@ -133,20 +133,17 @@ class RemapperAction : AnAction() {
                 }
             }
 
-            if (mTreeRerun != null) {
-                fileIndex = 0
-                remap(mTreeRerun, n + 1)
-            }
+            if (rerunCxt != null) resolve(rerunCxt, n + 1)
         }
-        remap(mTree, 1)
+        resolve(Remapper.Rerun.Context(mTree), 1)
 
         logger.warn("Mapping resolved in ${System.currentTimeMillis() - time}ms")
         progress.fraction(null)
         progress.text(null)
         progress.details(null)
 
-        fileCount = fileWriters.size
-        fileIndex = 0
+        val fileCount = fileWriters.size
+        var fileIndex = 0
         var writerIndex = 0
 
         fileWriters.forEach { (vf, writers) ->

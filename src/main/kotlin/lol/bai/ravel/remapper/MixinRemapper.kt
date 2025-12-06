@@ -84,7 +84,7 @@ private object AccessorPrefixes {
     // @formatter:on
 }
 
-class MixinRemapperFactory : ConstRemapperFactory(::MixinRemapper, "java")
+class MixinRemapperFactory : ExtensionRemapperFactory(::MixinRemapper, "java")
 class MixinRemapper : JavaRemapper() {
 
     private val logger = thisLogger()
@@ -109,6 +109,7 @@ class MixinRemapper : JavaRemapper() {
     private val remapMixins = psiStage a@{ pAnnotation: PsiAnnotation ->
         val pClass = pAnnotation.parent<PsiClass>() ?: return@a
         val className = pClass.qualifiedName ?: return@a
+        val classJvmName = pClass.jvmName ?: return@a
         val annotationName = pAnnotation.qualifiedName ?: return@a
 
         if (!annotationName.startsWith(mixin) && !annotationName.startsWith(mixinextras)) return@a
@@ -133,14 +134,17 @@ class MixinRemapper : JavaRemapper() {
         }
 
         if (annotationName == Mixin) {
+            val newTargetNames = linkedSetOf<Pair<String, String?>>()
+
             fun remapTarget(pTarget: PsiLiteralExpression) {
                 var target = pTarget.value as String
                 target = target.replace('.', '/')
                 mixinTargets.put(className, target)
 
-                val mTargetClass = mTree.getClass(target) ?: return
-                val newTarget = mTargetClass.newPkgPeriodName ?: return
-                write { pTarget.replace(factory.createExpressionFromText("\"${newTarget}\"", pTarget)) }
+                val mTargetClass = mTree.getClass(target)
+                val newTarget = mTargetClass?.newPkgPeriodName
+                newTargetNames.add(target.substringAfterLast('/') to newTarget?.substringAfterLast('.'))
+                if (newTarget != null) write { pTarget.replace(factory.createExpressionFromText("\"${newTarget}\"", pTarget)) }
             }
 
             val pTargets = pAnnotation.findDeclaredAttributeValue("targets")
@@ -165,6 +169,9 @@ class MixinRemapper : JavaRemapper() {
                     val pTargetClass = type.resolve() ?: return warnCantResolve()
                     val targetClassName = pTargetClass.jvmName ?: return warnCantResolve()
                     mixinTargets.put(className, targetClassName)
+
+                    val newTargetClassName = mTree.get(pTargetClass)?.newName?.substringAfterLast('/')
+                    newTargetNames.add(targetClassName.substringAfterLast('/') to newTargetClassName)
                 }
             }
 
@@ -177,6 +184,14 @@ class MixinRemapper : JavaRemapper() {
                 }
 
                 else -> warnNotLiterals(pClass)
+            }
+
+            if (newTargetNames.size == 1) {
+                val (targetClassName, newTargetClassName) = newTargetNames.first()
+
+                if (newTargetClassName != null && className.contains(targetClassName)) {
+                    rerun { mTree.putClass(classJvmName, classJvmName.replace(targetClassName, newTargetClassName)) }
+                }
             }
 
             return@a
@@ -253,7 +268,7 @@ class MixinRemapper : JavaRemapper() {
             }
             if (invokerPrefix != null) {
                 val newInvokerName = invokerPrefix + newMethodName.capitalizeFirstChar()
-                rerun { it.getOrPut(pClass).putMethod(pMethod.name, pMethod.jvmDesc, newInvokerName) }
+                rerun { mTree.getOrPut(pClass).putMethod(pMethod.name, pMethod.jvmDesc, newInvokerName) }
             }
             return@a
         }
@@ -295,7 +310,7 @@ class MixinRemapper : JavaRemapper() {
             }
             if (accessorPrefix != null) {
                 val newAccessorName = accessorPrefix + newFieldName.capitalizeFirstChar()
-                rerun { it.getOrPut(pClass).putMethod(methodName, pMethod.jvmDesc, newAccessorName) }
+                rerun { mTree.getOrPut(pClass).putMethod(methodName, pMethod.jvmDesc, newAccessorName) }
             }
             return@a
         }
@@ -614,7 +629,7 @@ class MixinRemapper : JavaRemapper() {
             if (memberNameHasPrefix) newMemberName = prefix + newMemberName
 
             rerun {
-                val mClass = it.getOrPut(pClass)
+                val mClass = mTree.getOrPut(pClass)
                 if (pMember is PsiField) mClass.putField(memberName, newMemberName)
                 else if (pMember is PsiMethod) mClass.putMethod(memberName, pMember.jvmDesc, newMemberName)
             }

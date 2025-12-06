@@ -45,6 +45,7 @@ dependencies {
         // https://plugins.jetbrains.com/docs/intellij/plugin-dependencies.html
         bundledPlugin("com.intellij.java")
         bundledPlugin("org.jetbrains.kotlin")
+        bundledPlugin("com.intellij.modules.json")
 
         testFramework(TestFrameworkType.Platform)
     }

@@ -23,7 +23,7 @@ import org.jetbrains.kotlin.psi.psiUtil.isImportDirectiveExpression
 import org.jetbrains.kotlin.psi.psiUtil.quoteIfNeeded
 
 // TODO: handle @JvmName
-class KotlinRemapperFactory: ConstRemapperFactory(::KotlinRemapper, "kt")
+class KotlinRemapperFactory: ExtensionRemapperFactory(::KotlinRemapper, "kt")
 class KotlinRemapper : JvmRemapper<KtFile>({ it as? KtFile }) {
 
     private val logger = thisLogger()
@@ -149,7 +149,7 @@ class KotlinRemapper : JvmRemapper<KtFile>({ it as? KtFile }) {
 
     private val nonFqnClassNames = hashMapOf<String, String>()
     private val collectClassNames = object : KotlinStage() {
-        override fun visitClass(kClass: KtClass) {
+        override fun visitClassOrObject(kClass: KtClassOrObject) {
             val className = kClass.name ?: return
             val classJvmName = kClass.jvmName ?: return
             nonFqnClassNames[className] = classJvmName

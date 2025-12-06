@@ -1,0 +1,6 @@
+<idea-plugin>
+    <extensions defaultExtensionNs="lol.bai.ravel">
+        <remapper id="fabric-mod-json" implementation="lol.bai.ravel.remapper.FabricModJsonRemapperFactory"/>
+        <remapper id="mixin-json" implementation="lol.bai.ravel.remapper.MixinJsonRemapperFactory"/>
+    </extensions>
+</idea-plugin>

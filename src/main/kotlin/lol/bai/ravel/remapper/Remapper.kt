@@ -11,13 +11,13 @@ val RemapperExtension = Extension<RemapperFactory>("lol.bai.ravel.remapper")
 
 abstract class RemapperFactory(
     val create: () -> Remapper,
-    val matches: (String) -> Boolean,
+    val matches: (VirtualFile) -> Boolean,
 )
 
-abstract class ConstRemapperFactory(
+abstract class ExtensionRemapperFactory(
     create: () -> Remapper,
     extension: String,
-) : RemapperFactory(create, { it == extension })
+) : RemapperFactory(create, { it.name.endsWith(".${extension}") })
 
 abstract class Remapper {
     protected lateinit var project: Project
@@ -50,7 +50,11 @@ abstract class Remapper {
     }
 
     fun interface Rerun {
-        operator fun invoke(modifier: (MutableMappingTree) -> Unit)
+        class Context(
+            val mTree: MutableMappingTree
+        )
+
+        operator fun invoke(ctx: Context.() -> Unit)
     }
 }
 

@@ -1,16 +1,14 @@
 package lol.bai.ravel.remapper
 
 import com.intellij.openapi.diagnostic.thisLogger
+import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.psi.*
 import com.intellij.psi.javadoc.PsiDocTagValue
 import lol.bai.ravel.mapping.rawQualifierSeparators
-import lol.bai.ravel.psi.implicitly
-import lol.bai.ravel.psi.jvmDesc
-import lol.bai.ravel.psi.jvmName
-import lol.bai.ravel.psi.jvmRaw
+import lol.bai.ravel.psi.*
 import lol.bai.ravel.util.linkedSetMultiMap
 
-class JavaRemapperFactory : ConstRemapperFactory(::JavaRemapper, "java")
+class JavaRemapperFactory : ExtensionRemapperFactory(::JavaRemapper, "java")
 open class JavaRemapper : JvmRemapper<PsiJavaFile>({ it as? PsiJavaFile }) {
     private val logger = thisLogger()
 
@@ -18,12 +16,14 @@ open class JavaRemapper : JvmRemapper<PsiJavaFile>({ it as? PsiJavaFile }) {
         override fun invoke() = pFile.accept(this)
     }
 
-    override fun stages() = listOf<Stage>(
-        collectClassNames,
+    override fun stages() = listOf(
+        remapClassName,
+        remapPackage,
         remapMembers,
         remapReferences,
         remapStaticImports,
         remapDocTagValues,
+        renameFile,
     )
 
     protected lateinit var java: JavaPsiFacade
@@ -54,13 +54,39 @@ open class JavaRemapper : JvmRemapper<PsiJavaFile>({ it as? PsiJavaFile }) {
         return pClass.findMethodsByName(name, false).find { it.jvmDesc == signature }
     }
 
-    // TODO: solve in-project class remapping
+    private val topLevelClasses = linkedMapOf<PsiClass, String>()
     private val nonFqnClassNames = hashMapOf<String, String>()
-    private val collectClassNames = object : JavaStage() {
+    private val remapClassName = object : JavaStage() {
         override fun visitClass(pClass: PsiClass) {
             val className = pClass.name ?: return
             val classJvmName = pClass.jvmName ?: return
-            nonFqnClassNames[className] = classJvmName
+
+            val mClass = mTree.get(pClass)
+            val newClassJvmName = mClass?.newName
+            val newClassName = mClass?.newFullPeriodName?.substringAfterLast('.')
+
+            nonFqnClassNames[newClassName ?: className] = newClassJvmName ?: classJvmName
+            if (pClass.containingClass == null) topLevelClasses[pClass] = newClassJvmName ?: classJvmName
+
+            if (newClassName == null) return
+            val pId = pClass.nameIdentifier ?: return
+            write { pId.replace(factory.createIdentifier(newClassName)) }
+        }
+    }
+    private val remapPackage = object : JavaStage() {
+        override fun visitPackageStatement(pStatement: PsiPackageStatement) {
+            val pPackageRef = pStatement.packageReference ?: return
+
+            val newPackageNames = topLevelClasses.values.map { it.substringBeforeLast('/') }.toSet()
+            if (newPackageNames.size != 1) {
+                logger.warn("File contains classes with different new packages")
+                val comment = topLevelClasses.map { (k, v) -> "${k.name} -> $v" }.joinToString(separator = "\n")
+                write { comment(pStatement, "TODO(Ravel): file contains classes with different new packages\n$comment") }
+                return
+            }
+
+            val newPackageName = newPackageNames.first().replace('/', '.')
+            write { pPackageRef.replace(factory.createPackageReferenceElement(newPackageName)) }
         }
     }
     private val remapMembers = object : JavaStage() {
@@ -110,7 +136,7 @@ open class JavaRemapper : JvmRemapper<PsiJavaFile>({ it as? PsiJavaFile }) {
             if (recordComponentName == uniqueNewGetterName) return
 
             write { pId.replace(factory.createIdentifier(uniqueNewGetterName)) }
-            rerun { it.getOrPut(pClass).putField(recordComponentName, uniqueNewGetterName) }
+            rerun { mTree.getOrPut(pClass).putField(recordComponentName, uniqueNewGetterName) }
         }
     }
     private val pStaticImportUsages = linkedSetMultiMap<String, PsiMember>()
@@ -230,6 +256,35 @@ open class JavaRemapper : JvmRemapper<PsiJavaFile>({ it as? PsiJavaFile }) {
                 write { pRef.handleElementRename(newMethodName) }
                 return
             }
+        }
+    }
+    private val renameFile = Stage s@{
+        if (topLevelClasses.isEmpty()) return@s
+
+        val (pClass, newClassJvmName) = topLevelClasses.entries
+            .firstOrNull { it.key.explicitly(PsiModifier.PUBLIC) }
+            ?: topLevelClasses.firstEntry()
+
+        val className = pClass.name ?: return@s
+        val classJvmName = pClass.jvmName ?: return@s
+        if (classJvmName == newClassJvmName) return@s
+        if (file.nameWithoutExtension != className) return@s
+
+        write {
+            val packageDir = classJvmName.substringBeforeLast('/')
+            val newPackageDir = newClassJvmName.substringBeforeLast('/')
+
+            if (packageDir != newPackageDir) {
+                var rootDir = file.parent
+                repeat(packageDir.split('/').size) {
+                    rootDir = rootDir.parent
+                }
+
+                file.move(null, VfsUtil.createDirectoryIfMissing(rootDir, newPackageDir))
+            }
+
+            val newClassName = newClassJvmName.substringAfterLast('/')
+            file.rename(null, "${newClassName}.java")
         }
     }
 }
