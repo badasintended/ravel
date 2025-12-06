@@ -19,9 +19,11 @@ abstract class PsiRemapper<F : PsiFile>(
     abstract fun comment(pElt: PsiElement, comment: String)
     override fun fileComment(comment: String) = comment(pFile, comment)
 
-    protected inline fun <reified E : PsiElement> psiStage(crossinline action: (E) -> Unit): Stage = Stage {
-        PsiTreeUtil.processElements(pFile, E::class.java) {
-            action(it)
+    protected inline fun <reified E : PsiElement> psiStage(crossinline action: (E) -> Unit): Stage = Stage { pFile.processChildren(action) }
+
+    protected inline fun <reified E : PsiElement> PsiElement.processChildren(crossinline action: (E) -> Unit) {
+        PsiTreeUtil.processElements(this, E::class.java) {
+            if (it != this) action(it)
             true
         }
     }

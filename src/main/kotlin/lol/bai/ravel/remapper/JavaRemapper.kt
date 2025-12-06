@@ -141,10 +141,11 @@ open class JavaRemapper : JvmRemapper<PsiJavaFile>({ it as? PsiJavaFile }) {
             }
 
             fun replaceClass(pClass: PsiClass, pClassRef: PsiJavaCodeReferenceElement) {
-                pClassRef.parameterList?.typeParameterElements?.forEach p@{ pParam ->
-                    val pParamRef = pParam.innermostComponentReferenceElement ?: return@p
-                    val pParamClass = pParamRef.resolve() as? PsiClass ?: return@p
-                    replaceClass(pParamClass, pParamRef)
+                pClassRef.parameterList?.typeParameterElements?.forEach { pParam ->
+                    pParam.processChildren p@{ pParamRef: PsiJavaCodeReferenceElement ->
+                        val pParamClass = pParamRef.resolve() as? PsiClass ?: return@p
+                        replaceClass(pParamClass, pParamRef)
+                    }
                 }
 
                 val pClassRefId = pClassRef.referenceNameElement as? PsiIdentifier ?: return
