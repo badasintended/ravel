@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+## [0.4.0]
+
+- UI: fixed progress modal not showing
+- Java: added support for remapping project classes
+- Mixin: remap mixin class name depending on new target class name
+- Mixin: also remap mixin configuration JSON
+- FMJ: remap entrypoints inside fabric.mod.json
+
 ## [0.3.3]
 
 - Mixin: remap accessor method directly instead of adding value parameter
@@ -47,7 +55,8 @@
 
 - Initial release
 
-[Unreleased]: https://github.com/badasintended/ravel/compare/0.3.3...HEAD
+[Unreleased]: https://github.com/badasintended/ravel/compare/0.4.0...HEAD
+[0.4.0]: https://github.com/badasintended/ravel/compare/0.3.3...0.4.0
 [0.3.3]: https://github.com/badasintended/ravel/compare/0.3.2...0.3.3
 [0.3.2]: https://github.com/badasintended/ravel/compare/0.3.1...0.3.2
 [0.3.1]: https://github.com/badasintended/ravel/compare/0.3.0...0.3.1
