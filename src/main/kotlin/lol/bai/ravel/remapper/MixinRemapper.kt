@@ -264,7 +264,7 @@ class MixinRemapper : JavaRemapper() {
             }
 
             if (pValue != null) {
-                write { pAnnotation.setDeclaredAttributeValue("value", factory.createExpressionFromText("\"${newMethodName}\"", pAnnotation)) }
+                write { pValue.replace(factory.createExpressionFromText("\"${newMethodName}\"", pValue)) }
             }
             if (invokerPrefix != null) {
                 val newInvokerName = invokerPrefix + newMethodName.capitalizeFirstChar()
@@ -306,7 +306,7 @@ class MixinRemapper : JavaRemapper() {
             val newFieldName = mTargetField.newName ?: return@a
 
             if (pValue != null) {
-                write { pAnnotation.setDeclaredAttributeValue("value", factory.createExpressionFromText("\"${newFieldName}\"", null)) }
+                write { pValue.replace(factory.createExpressionFromText("\"${newFieldName}\"", pValue)) }
             }
             if (accessorPrefix != null) {
                 val newAccessorName = accessorPrefix + newFieldName.capitalizeFirstChar()
@@ -432,7 +432,7 @@ class MixinRemapper : JavaRemapper() {
             return@a
         }
 
-        fun remapAtField(pMethod: PsiMethod, key: String, target: String) {
+        fun remapAtField(pMethod: PsiMethod, pLiteral: PsiLiteralExpression, target: String) {
             if (isWildcardOrRegex(pMethod, target)) return
 
             if (!target.contains(':')) {
@@ -466,10 +466,10 @@ class MixinRemapper : JavaRemapper() {
             val newTargetFieldDesc = mTree.remapDesc(targetFieldDesc)
             val newTarget = "\"L${newTargetClassName};${newTargetFieldName}:${newTargetFieldDesc}\""
 
-            write { pAnnotation.setDeclaredAttributeValue(key, factory.createExpressionFromText(newTarget, pAnnotation)) }
+            write { pLiteral.replace(factory.createExpressionFromText(newTarget, pLiteral)) }
         }
 
-        fun remapAtInvoke(pMethod: PsiMethod, key: String, target: String) {
+        fun remapAtInvoke(pMethod: PsiMethod, pLiteral: PsiLiteralExpression, target: String) {
             if (isWildcardOrRegex(pMethod, target)) return
 
             if (!target.contains('(')) {
@@ -503,16 +503,16 @@ class MixinRemapper : JavaRemapper() {
             val newTargetMethodDesc = mTree.remapDesc(targetMethodDesc)
             val newTarget = "\"L${newTargetClassName};${newTargetMethodName}${newTargetMethodDesc}\""
 
-            write { pAnnotation.setDeclaredAttributeValue(key, factory.createExpressionFromText(newTarget, pAnnotation)) }
+            write { pLiteral.replace(factory.createExpressionFromText(newTarget, pLiteral)) }
         }
 
         if (annotationName == Definition) {
             val pMethod = pAnnotation.parent<PsiMethod>() ?: return@a
 
-            fun remapTarget(pTargetElt: PsiElement, key: String, remap: (PsiMethod, String, String) -> Unit) = when (pTargetElt) {
-                is PsiLiteralExpression -> remap(pMethod, key, pTargetElt.value as String)
+            fun remapTarget(pTargetElt: PsiElement, remap: (PsiMethod, PsiLiteralExpression, String) -> Unit) = when (pTargetElt) {
+                is PsiLiteralExpression -> remap(pMethod, pTargetElt, pTargetElt.value as String)
                 is PsiArrayInitializerMemberValue -> pTargetElt.initializers.forEach {
-                    if (it is PsiLiteralExpression) remap(pMethod, key, it.value as String)
+                    if (it is PsiLiteralExpression) remap(pMethod, it, it.value as String)
                     else warnNotLiterals(pMethod)
                 }
 
@@ -520,10 +520,10 @@ class MixinRemapper : JavaRemapper() {
             }
 
             val pTargetFields = pAnnotation.findDeclaredAttributeValue("field")
-            if (pTargetFields != null) remapTarget(pTargetFields, "field", ::remapAtField)
+            if (pTargetFields != null) remapTarget(pTargetFields, ::remapAtField)
 
             val pTargetMethods = pAnnotation.findDeclaredAttributeValue("method")
-            if (pTargetMethods != null) remapTarget(pTargetMethods, "method", ::remapAtInvoke)
+            if (pTargetMethods != null) remapTarget(pTargetMethods, ::remapAtInvoke)
             return@a
         }
 
@@ -561,12 +561,12 @@ class MixinRemapper : JavaRemapper() {
             val target = pTarget.value as String
 
             if (point == Point.FIELD) {
-                remapAtField(pMethod, "target", target)
+                remapAtField(pMethod, pTarget, target)
                 return@a
             }
 
             if (Point.INVOKES.contains(point)) {
-                remapAtInvoke(pMethod, "target", target)
+                remapAtInvoke(pMethod, pTarget, target)
                 return@a
             }
 
@@ -578,7 +578,7 @@ class MixinRemapper : JavaRemapper() {
                     mClass.newName ?: target
                 }
 
-                write { pAnnotation.setDeclaredAttributeValue("target", factory.createExpressionFromText("\"${newTarget}\"", pAnnotation)) }
+                write { pTarget.replace(factory.createExpressionFromText("\"${newTarget}\"", pTarget)) }
                 return@a
             }
 
