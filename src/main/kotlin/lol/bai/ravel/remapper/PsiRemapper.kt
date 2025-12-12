@@ -2,6 +2,7 @@ package lol.bai.ravel.remapper
 
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
+import com.intellij.psi.PsiFileFactory
 import com.intellij.psi.PsiManager
 import com.intellij.psi.util.PsiTreeUtil
 
@@ -9,10 +10,12 @@ abstract class PsiRemapper<F : PsiFile>(
     val caster: (PsiFile?) -> F?,
 ) : Remapper() {
     protected lateinit var pFile: F
+    protected lateinit var pFileFactory: PsiFileFactory
 
     override fun init(): Boolean {
         val psi = PsiManager.getInstance(project)
         pFile = caster(psi.findFile(file)) ?: return false
+        pFileFactory = PsiFileFactory.getInstance(project)
         return true
     }
 

@@ -1,8 +1,10 @@
 package lol.bai.ravel.remapper
 
+import com.intellij.ide.highlighter.JavaFileType
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.psi.*
 import com.intellij.psi.javadoc.PsiDocTagValue
+import com.intellij.psi.util.childrenOfType
 import lol.bai.ravel.mapping.rawQualifierSeparators
 import lol.bai.ravel.psi.implicitly
 import lol.bai.ravel.psi.jvmDesc
@@ -19,6 +21,7 @@ open class JavaRemapper : JvmRemapper<PsiJavaFile>({ it as? PsiJavaFile }) {
     }
 
     override fun stages() = listOf(
+        collectImports,
         remapClassName,
         remapPackage,
         remapMembers,
@@ -56,6 +59,15 @@ open class JavaRemapper : JvmRemapper<PsiJavaFile>({ it as? PsiJavaFile }) {
         return pClass.findMethodsByName(name, false).find { it.jvmDesc == signature }
     }
 
+    private val importedClasses = linkedSetOf<String>()
+    private val collectImports = object : JavaStage() {
+        override fun visitImportStatement(pStatement: PsiImportStatement) {
+            super.visitImportStatement(pStatement)
+            if (pStatement.isOnDemand) return
+            val fqn = pStatement.qualifiedName ?: return
+            importedClasses.add(fqn)
+        }
+    }
     private val topLevelClasses = linkedMapOf<PsiClass, String>()
     private val nonFqnClassNames = hashMapOf<String, String>()
     private val remapClassName = object : JavaStage() {
@@ -180,37 +192,49 @@ open class JavaRemapper : JvmRemapper<PsiJavaFile>({ it as? PsiJavaFile }) {
                 return
             }
 
-            fun replaceClass(pClass: PsiClass, pClassRef: PsiJavaCodeReferenceElement) {
-                val pClassRefId = pClassRef.referenceNameElement as? PsiIdentifier ?: return
-                val mClass = mTree.get(pClass) ?: return
+            if (pTarget is PsiClass) {
+                val className = pTarget.qualifiedName ?: return
+                val pClassRefId = pRef.referenceNameElement as? PsiIdentifier ?: return
+                val mClass = mTree.get(pTarget) ?: return
                 val newJvmClassName = mClass.newName ?: return
                 val newClassName = mClass.newFullPeriodName ?: return
                 val newRefName = newClassName.substringAfterLast('.')
 
-                val pRefQual = pClassRef.qualifier as? PsiJavaCodeReferenceElement
+                var isQualified = false
+                val pRefQual = pRef.qualifier as? PsiJavaCodeReferenceElement
                 if (pRefQual != null) {
+                    isQualified = true
                     val pRefQualTarget = pRefQual.resolve()
-                    if (pRefQualTarget is PsiClass) {
-                        replaceClass(pRefQualTarget, pRefQual)
-                        write { pClassRefId.replace(factory.createIdentifier(newRefName)) }
-                        return
-                    } else {
-                        pRefQualTarget as PsiPackage
+                    if (pRefQualTarget is PsiPackage) {
                         val newQualName = newClassName.substringBeforeLast('.')
                         write { pRefQual.replace(factory.createPackageReferenceElement(newQualName)) }
                     }
                 }
 
                 if (nonFqnClassNames.contains(newRefName) && nonFqnClassNames[newRefName] != newJvmClassName) {
-                    write { pClassRef.replace(factory.createReferenceFromText(newClassName, pClassRef)) }
+                    write { pRef.replace(factory.createReferenceFromText(newClassName, pRef)) }
                     return
                 }
 
                 nonFqnClassNames[newRefName] = newJvmClassName
                 write { pClassRefId.replace(factory.createIdentifier(newRefName)) }
-            }
 
-            if (pTarget is PsiClass) replaceClass(pTarget, pRef)
+                if (!isQualified && pRef.parent !is PsiImportStatement && pTarget.containingFile != pFile && !importedClasses.contains(className)) {
+                    importedClasses.add(className)
+
+                    write {
+                        val pDummyClass = pFileFactory.createFileFromText(
+                            "_RavelDummy_.java", JavaFileType.INSTANCE, """
+                                package ${newClassName.substringBeforeLast('.')};
+                                public class $newRefName {}
+                            """.trimIndent()
+                        ).childrenOfType<PsiClass>().first()
+
+                        pFile.importClass(pDummyClass)
+                    }
+                }
+                return
+            }
         }
     }
     private val remapStaticImports = object : JavaStage() {
