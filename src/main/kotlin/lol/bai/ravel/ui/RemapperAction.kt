@@ -77,6 +77,14 @@ class RemapperAction : AnAction() {
         val fileWriters = listMultiMap<VirtualFile, () -> Unit>()
         var writersCount = 0
 
+        val global = object : Remapper.Global {
+            val values = mutableMapOf<String, Any>()
+
+            @Suppress("UNCHECKED_CAST")
+            override fun <T> invoke(key: String, factory: () -> T) =
+                values.getOrPut(key) { factory() as Any } as T
+        }
+
         fun resolve(runCxt: Remapper.Rerun.Context, n: Int) {
             val nText = if (n == 1) "" else " ($n)"
 
@@ -120,7 +128,7 @@ class RemapperAction : AnAction() {
 
                     for (factory in factories) {
                         val remapper = factory.create()
-                        val valid = remapper.init(project, scope, runCxt.mTree, vf, write, rerun)
+                        val valid = remapper.init(project, scope, global, runCxt.mTree, vf, write, rerun)
                         if (!valid) continue
 
                         try {

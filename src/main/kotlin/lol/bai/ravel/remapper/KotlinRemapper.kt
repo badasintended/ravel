@@ -2,10 +2,9 @@ package lol.bai.ravel.remapper
 
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.psi.*
-import lol.bai.ravel.psi.implicitly
-import lol.bai.ravel.psi.jvmName
 import lol.bai.ravel.util.*
 import org.jetbrains.kotlin.asJava.canHaveSyntheticGetter
+import org.jetbrains.kotlin.asJava.classes.KtLightClassForFacade
 import org.jetbrains.kotlin.asJava.toLightClass
 import org.jetbrains.kotlin.asJava.toLightElements
 import org.jetbrains.kotlin.asJava.toLightMethods
@@ -29,11 +28,21 @@ class KotlinRemapper : JvmRemapper<KtFile>({ it as? KtFile }) {
 
     private val logger = thisLogger()
 
-    private abstract inner class KotlinStage : KotlinRecursiveElementWalkingVisitor(), Stage {
+    val KtClassOrObject.jvmName get() = toLightClass()?.jvmName
+
+    val KtFile.jvmName: String?
+        get() {
+            for (pClass in classes) {
+                if (pClass is KtLightClassForFacade) return pClass.jvmName
+            }
+            return null
+        }
+
+    abstract inner class KotlinStage : KotlinRecursiveElementWalkingVisitor(), Stage {
         override fun invoke() = pFile.accept(this)
     }
 
-    override fun stages() = listOf(
+    override fun stages() = jvmStages() + listOf(
         remapClassNames,
         remapPackage,
         remapMembers,
@@ -148,6 +157,10 @@ class KotlinRemapper : JvmRemapper<KtFile>({ it as? KtFile }) {
         }
 
         return uniqueNewNames.first()
+    }
+
+    override val collectImports = object : KotlinStage() {
+        // TODO: Implement
     }
 
     private val topLevelClasses = linkedMapOf<PsiClass, String>()

@@ -3,8 +3,6 @@ package lol.bai.ravel.remapper
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.psi.*
 import lol.bai.ravel.mapping.ClassMapping
-import lol.bai.ravel.psi.jvmDesc
-import lol.bai.ravel.psi.jvmName
 import lol.bai.ravel.util.capitalizeFirstChar
 import lol.bai.ravel.util.decapitalizeFirstChar
 import lol.bai.ravel.util.setMultiMap
@@ -88,7 +86,7 @@ class MixinRemapperFactory : ExtensionRemapperFactory(::MixinRemapper, "java")
 class MixinRemapper : JavaRemapper() {
 
     private val logger = thisLogger()
-    override fun stages() = listOf(remapMixins)
+    override fun stages() = jvmStages() + listOf(remapMixins)
 
     private fun splitClassMember(classMember: String): Pair<String?, String> {
         if (classMember.startsWith('L')) {
@@ -159,20 +157,18 @@ class MixinRemapper : JavaRemapper() {
             }
 
             fun putClassTarget(pTarget: PsiClassObjectAccessExpression) {
-                val type = pTarget.operand.type
+                val type = pTarget.operand.innermostComponentReferenceElement ?: return
                 fun warnCantResolve() {
-                    write { todo(pClass, "can not resolve target class ${type.canonicalText}") }
-                    logger.warn("$className: can not resolve target class ${type.canonicalText}")
+                    write { todo(pClass, "can not resolve target class ${type.qualifiedName}") }
+                    logger.warn("$className: can not resolve target class ${type.qualifiedName}")
                 }
 
-                if (type is PsiClassType) {
-                    val pTargetClass = type.resolve() ?: return warnCantResolve()
-                    val targetClassName = pTargetClass.jvmName ?: return warnCantResolve()
-                    mixinTargets.put(className, targetClassName)
+                val pTargetClass = resolveReference(type) as? PsiClass ?: return warnCantResolve()
+                val targetClassName = pTargetClass.jvmName ?: return warnCantResolve()
+                mixinTargets.put(className, targetClassName)
 
-                    val newTargetClassName = mTree.get(pTargetClass)?.newName?.substringAfterLast('/')
-                    newTargetNames.add(targetClassName.substringAfterLast('/') to newTargetClassName)
-                }
+                val newTargetClassName = mTree.get(pTargetClass)?.newName?.substringAfterLast('/')
+                newTargetNames.add(targetClassName.substringAfterLast('/') to newTargetClassName)
             }
 
             val pValues = pAnnotation.findDeclaredAttributeValue("value")

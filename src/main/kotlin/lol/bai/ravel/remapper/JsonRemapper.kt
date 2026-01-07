@@ -2,11 +2,16 @@ package lol.bai.ravel.remapper
 
 import com.intellij.json.psi.JsonElementGenerator
 import com.intellij.json.psi.JsonFile
+import com.intellij.psi.PsiComment
 import com.intellij.psi.PsiElement
-import lol.bai.ravel.psi.createComment
 
 abstract class JsonRemapper : PsiRemapper<JsonFile>({ it as? JsonFile }) {
     protected lateinit var gen: JsonElementGenerator
+
+    fun JsonElementGenerator.createComment(comment: String): PsiComment {
+        val file = createDummyFile(comment)
+        return file.firstChild as PsiComment
+    }
 
     override fun init(): Boolean {
         if (!super.init()) return false

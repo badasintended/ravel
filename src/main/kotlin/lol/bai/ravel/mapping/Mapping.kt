@@ -1,10 +1,5 @@
 package lol.bai.ravel.mapping
 
-import com.intellij.psi.PsiClass
-import com.intellij.psi.PsiField
-import com.intellij.psi.PsiMethod
-import lol.bai.ravel.psi.jvmDesc
-import lol.bai.ravel.psi.jvmName
 import lol.bai.ravel.util.Cache
 
 val rawClassRegex = Regex("L([A-Za-z_$][A-Za-z0-9_$]*(?:/[A-Za-z_$][A-Za-z0-9_$]*)*);")
@@ -15,23 +10,6 @@ abstract class MappingTree {
 
     fun getClass(name: String?): ClassMapping? {
         return if (name == null) null else classes[name]
-    }
-
-    fun get(pClass: PsiClass): ClassMapping? {
-        val classJvmName = pClass.jvmName ?: return null
-        return getClass(classJvmName)
-    }
-
-    fun get(pField: PsiField): FieldMapping? {
-        val pClass = pField.containingClass ?: return null
-        val mClass = get(pClass) ?: return null
-        return mClass.getField(pField.name)
-    }
-
-    fun get(pMethod: PsiMethod): MethodMapping? {
-        val pClass = pMethod.containingClass ?: return null
-        val mClass = get(pClass) ?: return null
-        return mClass.getMethod(pMethod.name, pMethod.jvmDesc)
     }
 
     fun remapDesc(desc: String): String {
@@ -46,7 +24,6 @@ abstract class MappingTree {
 
 class MutableMappingTree : MappingTree() {
     fun getOrPutClass(oldName: String, newName: String?) = classes.getOrPut(oldName) { BasicClassMapping(oldName, newName) }
-    fun getOrPut(pClass: PsiClass) = getOrPutClass(pClass.jvmName!!, null)
 
     fun putClass(oldName: String, newName: String?) = putClass(BasicClassMapping(oldName, newName))
     fun putClass(mapping: MutableClassMapping) {

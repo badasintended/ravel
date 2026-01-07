@@ -27,16 +27,21 @@ abstract class Remapper {
     protected lateinit var write: Write
     protected lateinit var rerun: Rerun
 
+    private lateinit var _global: Global
+
     protected abstract fun init(): Boolean
-    fun init(project: Project, scope: GlobalSearchScope, mTree: MappingTree, file: VirtualFile, write: Write, rerun: Rerun): Boolean {
+    fun init(project: Project, scope: GlobalSearchScope, global: Global, mTree: MappingTree, file: VirtualFile, write: Write, rerun: Rerun): Boolean {
         this.project = project
         this.scope = scope
         this.mTree = mTree
         this.file = file
         this.write = write
         this.rerun = rerun
+        this._global = global
         return init()
     }
+
+    fun <T> global(key: String, factory: () -> T) = lazy { _global(key, factory) }
 
     abstract fun fileComment(comment: String)
     fun fileTodo(comment: String) = fileComment("TODO(Ravel): $comment")
@@ -57,6 +62,10 @@ abstract class Remapper {
         )
 
         operator fun invoke(ctx: Context.() -> Unit)
+    }
+
+    interface Global {
+        operator fun <T> invoke(key: String, factory: () -> T): T
     }
 }
 

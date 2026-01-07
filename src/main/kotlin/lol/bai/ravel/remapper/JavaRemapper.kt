@@ -6,11 +6,8 @@ import com.intellij.psi.*
 import com.intellij.psi.javadoc.PsiDocTagValue
 import com.intellij.psi.util.childrenOfType
 import lol.bai.ravel.mapping.rawQualifierSeparators
-import lol.bai.ravel.psi.implicitly
-import lol.bai.ravel.psi.jvmDesc
-import lol.bai.ravel.psi.jvmName
-import lol.bai.ravel.psi.jvmRaw
 import lol.bai.ravel.util.linkedSetMultiMap
+
 
 class JavaRemapperFactory : ExtensionRemapperFactory(::JavaRemapper, "java")
 open class JavaRemapper : JvmRemapper<PsiJavaFile>({ it as? PsiJavaFile }) {
@@ -20,8 +17,7 @@ open class JavaRemapper : JvmRemapper<PsiJavaFile>({ it as? PsiJavaFile }) {
         override fun invoke() = pFile.accept(this)
     }
 
-    override fun stages() = listOf(
-        collectImports,
+    override fun stages() = jvmStages() + listOf(
         remapClassName,
         remapPackage,
         remapMembers,
@@ -59,8 +55,7 @@ open class JavaRemapper : JvmRemapper<PsiJavaFile>({ it as? PsiJavaFile }) {
         return pClass.findMethodsByName(name, false).find { it.jvmDesc == signature }
     }
 
-    private val importedClasses = linkedSetOf<String>()
-    private val collectImports = object : JavaStage() {
+    override val collectImports = object : JavaStage() {
         override fun visitImportStatement(pStatement: PsiImportStatement) {
             super.visitImportStatement(pStatement)
             if (pStatement.isOnDemand) return
@@ -68,6 +63,7 @@ open class JavaRemapper : JvmRemapper<PsiJavaFile>({ it as? PsiJavaFile }) {
             importedClasses.add(fqn)
         }
     }
+
     private val topLevelClasses = linkedMapOf<PsiClass, String>()
     private val nonFqnClassNames = hashMapOf<String, String>()
     private val remapClassName = object : JavaStage() {
@@ -171,7 +167,7 @@ open class JavaRemapper : JvmRemapper<PsiJavaFile>({ it as? PsiJavaFile }) {
             if (pRef is PsiImportStaticReferenceElement) return
             val pRefId = pRef.referenceNameElement as? PsiIdentifier ?: return
 
-            val pTarget = pRef.resolve() ?: return
+            val pTarget = resolveReference(pRef) ?: return
             val pSafeParent = pRef.parent<PsiNamedElement>() ?: pFile
 
             if (pTarget is PsiField) {
@@ -204,8 +200,8 @@ open class JavaRemapper : JvmRemapper<PsiJavaFile>({ it as? PsiJavaFile }) {
                 val pRefQual = pRef.qualifier as? PsiJavaCodeReferenceElement
                 if (pRefQual != null) {
                     isQualified = true
-                    val pRefQualTarget = pRefQual.resolve()
-                    if (pRefQualTarget is PsiPackage) {
+                    val pRefQualTarget = resolveReference(pRefQual)
+                    if (pRefQualTarget !is PsiClass) {
                         val newQualName = newClassName.substringBeforeLast('.')
                         write { pRefQual.replace(factory.createPackageReferenceElement(newQualName)) }
                     }
@@ -242,7 +238,7 @@ open class JavaRemapper : JvmRemapper<PsiJavaFile>({ it as? PsiJavaFile }) {
             super.visitImportStaticReferenceElement(pRef)
             val pRefId = pRef.referenceNameElement as? PsiIdentifier ?: return
             val pStatement = pRef.parent<PsiImportStaticStatement>() ?: return
-            val pClass = pRef.classReference.resolve() as? PsiClass ?: return
+            val pClass = resolveReference(pRef.classReference) as? PsiClass ?: return
             val memberName = pRefId.text
 
             val pUsages = pStaticImportUsages[memberName].orEmpty().ifEmpty {
