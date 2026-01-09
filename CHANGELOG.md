@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+## [0.6.1]
+
+- Java: fixed incorrect TODO comments on package-info files
+
 ## [0.6.0]
 
 - Java: added partial support for remapping unresolvable class reference
@@ -75,7 +79,8 @@
 
 - Initial release
 
-[Unreleased]: https://github.com/badasintended/ravel/compare/0.6.0...HEAD
+[Unreleased]: https://github.com/badasintended/ravel/compare/0.6.1...HEAD
+[0.6.1]: https://github.com/badasintended/ravel/compare/0.6.0...0.6.1
 [0.6.0]: https://github.com/badasintended/ravel/compare/0.5.0...0.6.0
 [0.5.0]: https://github.com/badasintended/ravel/compare/0.4.2...0.5.0
 [0.4.2]: https://github.com/badasintended/ravel/compare/0.4.1...0.4.2
