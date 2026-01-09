@@ -90,6 +90,7 @@ open class JavaRemapper : JvmRemapper<PsiJavaFile>({ it as? PsiJavaFile }) {
             super.visitPackageStatement(pStatement)
 
             val newPackageNames = topLevelClasses.values.map { it.substringBeforeLast('/') }.toSet()
+            if (newPackageNames.isEmpty()) return
             if (newPackageNames.size != 1) {
                 logger.warn("File contains classes with different new packages")
                 val comment = topLevelClasses.map { (k, v) -> "${k.name} -> $v" }.joinToString(separator = "\n")

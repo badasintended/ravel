@@ -191,6 +191,7 @@ class KotlinRemapper : JvmRemapper<KtFile>({ it as? KtFile }) {
             if (topLevelClasses.isEmpty()) return
 
             val newPackageNames = topLevelClasses.values.map { it.substringBeforeLast('/') }.toSet()
+            if (newPackageNames.isEmpty()) return
             if (newPackageNames.size != 1) {
                 logger.warn("File contains classes with different new packages")
                 val comment = topLevelClasses.map { (k, v) -> "${k.name} -> $v" }.joinToString(separator = "\n")
