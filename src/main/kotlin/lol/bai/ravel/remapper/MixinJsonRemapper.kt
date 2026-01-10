@@ -34,7 +34,10 @@ class MixinJsonRemapper : JsonRemapper() {
             }
         }
 
-        val newCommonPrefix = newValues.values.commonPrefix()
+        val newCommonPrefix = newValues.values
+            .map { it.substringBeforeLast('/') + '/' }
+            .commonPrefix()
+
         if (!newCommonPrefix.endsWith('/')) {
             logger.warn("Does not have a concrete new package name")
             write { todo(root, "Does not have a concrete package name") }
