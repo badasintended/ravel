@@ -1,7 +1,6 @@
 package lol.bai.ravel.util
 
 import io.ktor.client.*
-import io.ktor.client.engine.okhttp.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -10,7 +9,7 @@ import java.nio.file.Path
 import kotlin.io.path.createParentDirectories
 import kotlin.io.path.outputStream
 
-val http = HttpClient(OkHttp)
+val http = HttpClient()
 
 suspend fun downloadToFile(url: String, dest: Path, progress: ((downloaded: Long, total: Long?) -> Unit)? = null) {
     val response = http.get(url)
