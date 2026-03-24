@@ -9,9 +9,13 @@ import io.ktor.http.*
 import lol.bai.ravel.util.downloadToFile
 import lol.bai.ravel.util.http
 import java.nio.file.Path
+import java.time.Instant
 
 class MojMapDownloader : MappingDownloader("Mojang Mappings") {
     private val logger = thisLogger()
+
+    private val mojMapTime = Instant.parse("2019-09-04T11:19:34+00:00").minusSeconds(1)
+    private val unobfuscatedTime = Instant.parse("2025-12-16T12:42:29+00:00")
 
     private lateinit var versions: JsonArray
 
@@ -24,7 +28,13 @@ class MojMapDownloader : MappingDownloader("Mojang Mappings") {
         return try {
             versions = JsonParser.parseString(json).asJsonObject
                 .getAsJsonArray("versions")
-            versions.map { it.asJsonObject.get("id").asString }
+            versions
+                .map { it.asJsonObject }
+                .filter {
+                    val releaseTime = Instant.parse(it.get("releaseTime").asString)
+                    releaseTime.isAfter(mojMapTime) && releaseTime.isBefore(unobfuscatedTime)
+                }
+                .map { it.get("id").asString }
         } catch (e: Exception) {
             logger.error(e)
             emptyList()

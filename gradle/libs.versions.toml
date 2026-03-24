@@ -1,5 +1,5 @@
 [versions]
-ravel = "0.6.3"
+ravel = "0.6.4"
 
 changelog = "2.4.0"
 github-api = "1.314"

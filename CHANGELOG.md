@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+## [0.6.4]
+
+- Fix: limit mojmap downloader to known version ranges
+
 ## [0.6.3]
 
 - Fix: don't specify ktor http client engine, fixed compatibility for 2026.1
@@ -87,7 +91,8 @@
 
 - Initial release
 
-[Unreleased]: https://github.com/badasintended/ravel/compare/0.6.3...HEAD
+[Unreleased]: https://github.com/badasintended/ravel/compare/0.6.4...HEAD
+[0.6.4]: https://github.com/badasintended/ravel/compare/0.6.3...0.6.4
 [0.6.3]: https://github.com/badasintended/ravel/compare/0.6.2...0.6.3
 [0.6.2]: https://github.com/badasintended/ravel/compare/0.6.1...0.6.2
 [0.6.1]: https://github.com/badasintended/ravel/compare/0.6.0...0.6.1
