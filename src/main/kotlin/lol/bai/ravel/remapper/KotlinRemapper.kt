@@ -42,6 +42,31 @@ class KotlinRemapper : JvmRemapper<KtFile>({ it as? KtFile }) {
         override fun invoke() = pFile.accept(this)
     }
 
+    private val pendingClassImports = linkedSetOf<String>()
+
+    private fun queueClassImport(kRef: KtSimpleNameExpression, newClassName: String, oldClassName: String?, pTargetFile: PsiFile?) {
+        if (kRef.isImportDirectiveExpression()) return
+
+        val kRefParent = kRef.parent as? KtDotQualifiedExpression
+        if (kRefParent?.selectorExpression == kRef) return
+
+        if (pTargetFile == null || pTargetFile == pFile) return
+        if (oldClassName == null || oldClassName == newClassName) return
+
+        val newPackageName = newClassName.substringBeforeLast('.', "")
+        if (newPackageName == pFile.packageFqName.asString()) return
+
+        pendingClassImports.add(newClassName)
+    }
+
+    private fun hasExplicitImport(fqName: String): Boolean {
+        return pFile.importDirectives.any {
+            !it.isAllUnder
+                && it.aliasName == null
+                && it.importedFqName?.asString() == fqName
+        }
+    }
+
     override fun stages() = jvmStages() + listOf(
         remapClassNames,
         remapPackage,
@@ -160,7 +185,15 @@ class KotlinRemapper : JvmRemapper<KtFile>({ it as? KtFile }) {
     }
 
     override val collectImports = object : KotlinStage() {
-        // TODO: Implement
+        override fun visitImportDirective(kImport: KtImportDirective) {
+            super.visitImportDirective(kImport)
+            if (kImport.aliasName != null) return
+            if (kImport.isAllUnder) return
+
+            val fqName = kImport.importedFqName?.asString() ?: return
+            importedClasses.add(fqName)
+            nonFqnClassNames.putIfAbsent(fqName.substringAfterLast('.'), fqName)
+        }
     }
 
     private val topLevelClasses = linkedMapOf<PsiClass, String>()
@@ -412,6 +445,7 @@ class KotlinRemapper : JvmRemapper<KtFile>({ it as? KtFile }) {
                     if (kClass.name != kRef.getReferencedName()) return
                     staticTargetClassName = kClass.jvmName
                     val newTargetName = mTree.getClass(kClass.jvmName)?.newFullPeriodName ?: return
+                    queueClassImport(kRef, newTargetName, kClass.fqName?.asString(), kClass.containingFile)
                     write { kRef.replace(factory.createSimpleName(newTargetName.substringAfterLast('.').quoteIfNeeded())) }
                 }
 
@@ -428,6 +462,7 @@ class KotlinRemapper : JvmRemapper<KtFile>({ it as? KtFile }) {
                     if (jClass.name != kRef.getReferencedName()) return
                     staticTargetClassName = jClass.jvmName
                     val newTargetName = mTree.get(jClass)?.newFullPeriodName ?: return
+                    queueClassImport(kRef, newTargetName, jClass.qualifiedName, jClass.containingFile)
                     write { kRef.replace(factory.createSimpleName(newTargetName.substringAfterLast('.').quoteIfNeeded())) }
                 }
 
@@ -486,6 +521,24 @@ class KotlinRemapper : JvmRemapper<KtFile>({ it as? KtFile }) {
         }
     }
     private val remapImports = object : KotlinStage() {
+        override fun invoke() {
+            super.invoke()
+
+            pendingClassImports.forEach { className ->
+                write w@{
+                    if (hasExplicitImport(className)) return@w
+                    val importList = pFile.importList ?: return@w
+
+                    val directive = factory
+                        .createFile("import $className\n")
+                        .importDirectives
+                        .firstOrNull() ?: return@w
+
+                    importList.add(directive)
+                }
+            }
+        }
+
         override fun visitImportDirective(kImport: KtImportDirective) {
             super.visitImportDirective(kImport)
             val kRefExp = kImport.importedReference ?: return
